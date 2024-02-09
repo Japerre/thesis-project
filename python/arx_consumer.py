@@ -286,6 +286,11 @@ def run_model_cv_non_generalized(experiment_num, fold_path, target, pipe):
 	save_ml_experiment(fold_path/'ml_experiments'/f'experiment_{experiment_num}', pipe, report)
 	return report
 
+def parallel_run_model_cv(params):
+	#pipe altijd opnieuw aanmaken, zien dat dat telkesn een copy is
+	#pipe zijn objecten die state bijhouden van andere runs, dus dat is om problemen vragen
+	experiment_num, fold_path, target, pipe = params
+
 
 def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
 	pipes_tuple = get_pipelines(experiment_num)
@@ -298,8 +303,10 @@ def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
 			]
 		for i in range(2):
 			reports = []
+			jobs = []
 			for fold in range(NUM_FOLDS):
 				fold_path = FOLDS_PATH/f'fold_{fold}'
+				jobs.append((experiment_num, fold_path, TARGET, pipes[i]))
 				reports.append(run_model_cv_non_generalized(experiment_num, fold_path, TARGET, pipes[i]))
 			calculate_mean_std(reports, output_paths[i], TARGETS)
 	else:
@@ -363,6 +370,8 @@ def ml_worker_cv_ldiv(experiment_num, verbose=False):
 
 
 if __name__ == '__main__':
+	global NUMBER_OF_THREADS
+	NUMBER_OF_THREADS = 8
 	config_path = 'config/nursery.ini'
 	# config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
 	# config_path = 'config/cmc.ini'
@@ -377,7 +386,5 @@ if __name__ == '__main__':
 	# if ML:
 	# 	# calculate_non_generalized_ml(True)
 	# 	# test_2()
-	# 	ml_worker_cv(1, ['SSample', 'BSample'])
+	ml_worker_cv(1, ['SSample', 'BSample'])
 	# 	# ml_worker_cv_ldiv(1)
-	# 	# ml_worker(False, 2, ['SSample'])
-	# 	# test_ml()

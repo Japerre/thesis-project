@@ -73,7 +73,7 @@ public class Main {
             for (int foldNumber = 0; foldNumber < NUMBER_OF_FOLDS; foldNumber++) {
                 String foldDir = OutputWriter.makeFoldDir(foldNumber, cfg.getString("lDiversityBasePath"));
                 String trainPath = cfg.getString("foldsPath") + "/fold_" + foldNumber + "/train.csv";
-                
+
                 for (int k : kValues) {
                     for (double l : lValues) {
                         LdiversityRun ldiversityRun = new LdiversityRun(k, l, cfg, foldDir, trainPath);
@@ -123,10 +123,10 @@ public class Main {
         }
     }
 
-    public static void makeFolds() throws InterruptedException, IOException {
+    public static void makeFolds(String pythonEnvPath) throws InterruptedException, IOException {
         String inputDataFile = cfg.getString("inputDataFile");
         ProcessBuilder processBuilder = new ProcessBuilder(
-                "C:\\Users\\tibol\\anaconda3\\envs\\folktables\\python",
+                pythonEnvPath,
                 "python/data_splitter.py",
                 inputDataFile,
                 cfg.getString("crossValidate"));
@@ -149,8 +149,11 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
+
         String configFilePath = args[0];
         numberOfThreads = Integer.parseInt(args[1]);
+        String pythonEnvPath = args[2]; //"C:\\Users\\tibol\\anaconda3\\envs\\folktables\\python","python/data_splitter.py"
+
 //        String configFilePath = "src/config/nursery.properties";
 //        String configFilePath = "src/config/ASCIncome_USA_2018_binned_imbalanced_16645.properties";
 //        String configFilePath = "src/config/ASCIncome_USA_2018_binned_imbalanced_1664500.properties";
@@ -158,7 +161,7 @@ public class Main {
 //        String configFilePath = "src/config/cmc.properties";
         readProgramConfig(configFilePath);
         if (cfg.getBoolean("crossValidate")) {
-            makeFolds();
+            makeFolds(pythonEnvPath);
         }
         if (cfg.getBoolean("kAnon")) {
             runKAnon();
