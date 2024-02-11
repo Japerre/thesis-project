@@ -152,7 +152,7 @@ public class Main {
 
         String configFilePath = args[0];
         numberOfThreads = Integer.parseInt(args[1]);
-        String pythonEnvPath = args[2]; //"C:\\Users\\tibol\\anaconda3\\envs\\folktables\\python","python/data_splitter.py"
+        String pythonEnvPath = args[2]; //"C:\\Users\\tibol\\anaconda3\\envs\\folktables\\python"
 
 //        String configFilePath = "src/config/nursery.properties";
 //        String configFilePath = "src/config/ASCIncome_USA_2018_binned_imbalanced_16645.properties";

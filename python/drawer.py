@@ -318,16 +318,16 @@ def cmp_balancing_pre_post(
 
 if __name__ == '__main__':
 	# config_path = 'config/cmc.ini'
-	# config_path = 'config/nursery.ini'
-	config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
+	config_path = 'config/nursery.ini'
+	# config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
 	# config_path = 'config/income_binned_USA_1664500.ini'
 	read_config(config_path)
 	# save_privacy_plots()
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
-	grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=ASCIncome_target_names(), plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=cmc_target_names(), plot_std=True)
-	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, plot_std=True)
+	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=cmc_target_names(), plot_std=True)
+	grouped_bar_chart_big_image(['BSAMPLE'], 1, plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(
 	# 	sample_strats=['SSAMPLE', 'BSAMPLE', 'RSAMPLE'], 

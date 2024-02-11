@@ -74,7 +74,6 @@ public class OutputWriter {
 
     private static void deleteExistingExperiment(Path experimentBasePath) throws IOException {
         if (!Files.exists(experimentBasePath)) {
-            System.out.println("experiment folder doesn't exist");
             return;
         }
         Files.walk(experimentBasePath)
