@@ -15,7 +15,7 @@ def format_mean_std(mean, std):
 	return f"{mean:.1f} ± {std:.1f}"  # Format mean and std with one decimal precision
 
 
-def generelization_stats(k_list, num_folds, k_anon_base_path, output_base_path, qid_list):
+def generalization_stats(k_list, num_folds, k_anon_base_path, output_base_path, qid_list):
 	# header = ['k','n']+qid_list+['suppressed_cnt', 'std_suppressed', 'sample_size', 'std_sample_size', 'EQ_cnt', 'std_EQ', 'avg_EQ_size', 'std_avg_EQ_size']
 	header = ['k','n']+qid_list+['suppressed_cnt', 'sample_size','EQ_cnt', 'avg_EQ_size']
 	records = []
@@ -45,34 +45,39 @@ def generelization_stats(k_list, num_folds, k_anon_base_path, output_base_path, 
 	df.to_csv(generelization_stats_path, sep=';', index=False)
 
 
-def sample_stats(strats_to_run, k_list, b_list, num_folds, output_base_path, qid_list, target):
-	target_count_check = 0
+def sample_stats(strats_to_run, k_list, b_list, num_folds, output_base_path, qid_list, target_col, targets):
 	for strat in strats_to_run:
 		result_data = []
 		for k in k_list:
 			for b in b_list:
 				target_counts_list = []
+				min_counts = {target: np.inf for target in targets}
+				max_counts = {target: -np.inf for target in targets}
 				for fold in range(num_folds):
 					sample_path = output_base_path/strat/f'fold_{fold}'/f'k{k}'/f'B({b})'/f'B({b})_sample.csv'
 					sample_df = pd.read_csv(sample_path, delimiter=';')
 					sample_df = drop_suppressed(sample_df, qid_list)
-					target_counts = sample_df[target].value_counts()
-					
-					if target_count_check != 0 and target_count_check != len(target_counts):
-						print(f"strat: {strat}, fold: {fold}, k: {k}, b: {b} ==> does not have all classes in train set")
-						# raise ValueError(f"strat: {strat}, fold: {fold}, k: {k}, b: {b} ==> does not have all classes in train set")
-					else:
-						target_count_check = len(target_counts)
-					
+					target_counts = sample_df[target_col].value_counts()
+					missing_targets = set(targets) - set(target_counts.index)
+					for missing_target in missing_targets:
+						min_counts[missing_target] = 0
+						max_counts[missing_target] = max(max_counts[missing_target], 0)
+						print(f"strat: {strat}, fold: {fold}, k: {k}, b: {b} ==> does not have {missing_target} in train set")	
+
+					for target, count in target_counts.items():
+						min_counts[target] = min(min_counts[target], count)
+						max_counts[target] = max(max_counts[target], count)
+						
 					target_counts_list.append(target_counts)
+
 				
 				target_counts_df = pd.concat(target_counts_list, axis=1)
 				mean_counts = target_counts_df.mean(axis=1)
 				std_counts = target_counts_df.std(axis=1)
 				
+				min_max_col = {f'{target} range': f'[{min_counts[target]}, {max_counts[target]}]' for target in min_counts.keys()}
 				formatted_data = {f"{target}": format_mean_std(mean, std) for target, mean, std in zip(mean_counts.index, mean_counts, std_counts)}
-
-				result_data.append({'Strat': strat, 'k': k, 'b': b, **formatted_data})
+				result_data.append({'Strat': strat, 'k': k, 'b': b, **formatted_data, **min_max_col})
 
 		result_df = pd.DataFrame(result_data)
 		sample_stats_path = output_base_path/'stats'/f'{strat}'/'target_counts_stats.csv'
@@ -102,8 +107,6 @@ def eq_per_target(strats_to_run, k_list, b_list, num_folds, output_base_path, qi
 					eq_counts_dict = {}
 					for group_name, target_group_df in target_groups:
 						eq_count = target_group_df.groupby(qid_list).ngroups
-						# if eq_count == 0:
-						# 	print(f"strat: {strat}, fold: {fold}, k: {k}, b: {b} ==> does not have all classes in train set")
 						eq_counts_dict[group_name] = eq_count
 						min_counts[group_name] = min(min_counts[group_name], eq_count)
 						max_counts[group_name] = max(max_counts[group_name], eq_count)

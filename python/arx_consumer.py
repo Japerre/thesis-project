@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import os
+import sys
 import shutil
 import json
 from pprint import pprint
@@ -16,7 +17,7 @@ from copy import deepcopy
 
 from configparser import ConfigParser, ExtendedInterpolation
 
-from stats import generelization_stats, sample_stats, eq_per_target
+from stats import generalization_stats, sample_stats, eq_per_target
 
 
 def read_config(config_path):
@@ -42,30 +43,28 @@ def read_config(config_path):
   APPEND_ML_EXPERIMENTS = cfg.getboolean('BOOLEANS', 'append_ml_experiments')
 
   # VARIABLES
-  global NUM_PROCESSES, NUM_FOLDS, DATASET_NAME, K_LIST, B_LIST, L_LIST, TARGETS
+  global NUM_PROCESSES, NUM_FOLDS, DATASET_NAME, K_LIST, B_LIST, L_LIST, TARGETS, EXP_NUMBERS
   NUM_PROCESSES = cfg.getint('VARIABLES', 'num_processes')
   NUM_FOLDS = cfg.getint('VARIABLES', 'num_folds')
   DATASET_NAME= cfg['VARIABLES']['dataset_name']
-  K_LIST = [5, 10, 20, 40, 80, 160]
-  B_LIST = [0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625]
-  L_LIST = [1.0, 1.25, 1.5, 1.75, 2.0, 2.25]
+  
+  K_LIST = [int(num) for num in cfg.get('VARIABLES', 'k_list').split(',')]
+  B_LIST = [float(num) for num in cfg.get('VARIABLES', 'b_list').split(',')]
+  L_LIST = [float(num) for num in cfg.get('VARIABLES', 'l_list').split(',')]
+
+  # K_LIST = [5, 10, 20, 40, 80, 160]
+  # B_LIST = [0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625]
+  # L_LIST = [1.0, 1.25, 1.5, 1.75, 2.0, 2.25]
   TARGETS = cfg.get('VARIABLES', 'targets').split(',')
+  if DATASET_NAME == 'cmc':
+    TARGETS = [int(target) for target in TARGETS]
+  EXP_NUMBERS = [int(num) for num in cfg.get('VARIABLES', 'experiment_numbers').split(',')]
 
   # OTHER
   global QID_LIST, CAT, NUM, TARGET
   QID_LIST = get_qid()
   CAT, NUM, TARGET = get_datatypes()
   
-
-# def get_ASCIncome_targets():
-#   return ['[0-20000[', '[20000-100000[', '[100000-inf[']
-
-# def get_cmc_targets():
-#   return ['1', '2', '3']
-
-# def get_nursery_targets():
-#   return ['priority', 'not_recom', 'very_recom', 'spec_prior']
-
 def get_pipelines(experiment_num, verbose=False):
   if(DATASET_NAME=='cmc'):
     from pipelines.CMC_pipelines import experiment_1_pipeline, experiment_2_pipeline, experiment_3_pipeline
@@ -149,16 +148,6 @@ def get_generalised(dataset: pd.DataFrame, stats_file: Path, qid_list, hierarchi
     dataset[qi] = dataset[qi].map(generalization)
   return dataset
 
-def save_test_generalized(stats_file: Path):
-  test_dataset_generalized = get_generalised(TEST_DF, stats_file)
-  X_test_generalized, y_test_generalized = get_xy_split(test_dataset_generalized)
-  test_generalized_dir = stats_file.parent / 'test_generalized'
-  if not os.path.exists(test_generalized_dir):
-    os.makedirs(test_generalized_dir)
-  X_test_generalized.to_csv(test_generalized_dir / 'X_test_generalized.csv', sep=';', decimal=',', index=False)
-  y_test_generalized.to_csv(test_generalized_dir / 'y_test_generalized.csv', sep=';', decimal=',', index=False)
-  return test_dataset_generalized
-
 def get_stats_file(k_dir_name: str, fold_num=None):
   if fold_num==None:
     return K_ANON_BASE_PATH / k_dir_name / 'stats.csv'
@@ -211,24 +200,19 @@ def save_ml_experiment(experiment_dir: Path, pipe: Pipeline, report):
 
 
 def calculate_mean_std(reports, output_path, targets):
+  targets = deepcopy(targets)
   os.makedirs(output_path.parent, exist_ok=True)
   avg_report = {}
   targets += ['macro avg', 'weighted avg']
   for target in targets:
-    avg_report[target] = {}
-    precision = []
-    recall = []
-    f1 = []
-    for report in reports:
-      precision.append(report[target]['precision'])
-      recall.append(report[target]['recall'])
-      f1.append(report[target]['f1-score'])
-    avg_report[target]['mean_precision'] = np.average(precision)
-    avg_report[target]['std_precision'] = np.std(precision)
-    avg_report[target]['mean_recall'] = np.average(recall)
-    avg_report[target]['std_recall'] = np.std(recall)
-    avg_report[target]['mean_f1-score'] = np.average(f1)
-    avg_report[target]['std_f1-score'] = np.std(f1)
+      avg_report[target] = {
+          'mean_precision': np.average([report[target]['precision'] for report in reports]),
+          'std_precision': np.std([report[target]['precision'] for report in reports]),
+          'mean_recall': np.average([report[target]['recall'] for report in reports]),
+          'std_recall': np.std([report[target]['recall'] for report in reports]),
+          'mean_f1-score': np.average([report[target]['f1-score'] for report in reports]),
+          'std_f1-score': np.std([report[target]['f1-score'] for report in reports])
+      }
 
   with open(output_path, 'w') as json_file:
     json.dump(avg_report, json_file, indent=2)	
@@ -236,17 +220,6 @@ def calculate_mean_std(reports, output_path, targets):
 def get_ml_run_report(y_test_generalized, y_predict, y_train):
   y_train = y_train.astype(str)
   report = classification_report(y_test_generalized, y_predict, output_dict=True)
-  train_record_counts = {}
-  sum = 0
-  
-  #TODO: this is probably not correct ==> suppressed records are still included in the count!
-  for target_value in y_train.unique():
-    target_value_count = len(y_train[y_train == target_value])
-    sum += target_value_count
-    train_record_counts[target_value] = target_value_count
-
-  train_record_counts['sum'] = sum
-  report['train_record_counts'] = train_record_counts
   return report
 
 def run_model_cv(params):
@@ -282,7 +255,7 @@ def parallel_run_model_cv(jobs, non_generalized):
   with Pool(processes=NUM_PROCESSES) as pool:
 	  return list(pool.imap(target_func, jobs))
 
-def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
+def ml_worker_cv_nonmasked(experiment_num, verbose=False):
   pipes_tuple = get_pipelines(experiment_num)
   if experiment_num==3:
     pipe, non_masked_pipe, non_masked_balanced_ROS_pipe = pipes_tuple
@@ -308,6 +281,8 @@ def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
     reports = parallel_run_model_cv(jobs, non_generalized=True)
     calculate_mean_std(reports, output_path, TARGETS)
 
+def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
+  pipe, *_ = get_pipelines(experiment_num)
   for strat in strats_to_run:
     for k in K_LIST:
       for b in B_LIST:
@@ -323,31 +298,7 @@ def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
 
 
 def ml_worker_cv_ldiv(experiment_num, verbose=False):
-  pipes_tuple = get_pipelines(experiment_num)
-  if experiment_num==3:
-    pipe, non_masked_pipe, non_masked_balanced_ROS_pipe = pipes_tuple
-    pipes = [non_masked_pipe, non_masked_balanced_ROS_pipe]
-    output_paths = [
-      FOLDS_PATH/'ml_experiments'/f'experiment_{experiment_num}'/'non_balanced'/'classification_report.json',
-      FOLDS_PATH/'ml_experiments'/f'experiment_{experiment_num}'/'balanced'/'classification_report.json'
-      ]
-    for i in range(2):
-      jobs = []
-      for fold in range(NUM_FOLDS):
-        fold_path = FOLDS_PATH/f'fold_{fold}'
-        jobs.append((experiment_num, fold_path, TARGET, deepcopy(pipes[i])))
-      reports = parallel_run_model_cv(jobs, non_generalized=True)
-      calculate_mean_std(reports, output_paths[i], TARGETS)
-  else:
-    pipe, non_masked_pipe = pipes_tuple
-    output_path = FOLDS_PATH/'ml_experiments'/f'experiment_{experiment_num}'/'classification_report.json'
-    jobs = []
-    for fold in range(NUM_FOLDS):
-      fold_path = FOLDS_PATH/f'fold_{fold}'
-      jobs.append((experiment_num, fold_path, TARGET, deepcopy(non_masked_pipe)))
-    reports = parallel_run_model_cv(jobs, non_generalized=True)
-    calculate_mean_std(reports, output_path, TARGETS)
-
+  pipe, *_ = get_pipelines(experiment_num)
   for k in K_LIST:
     for l in L_LIST:
       jobs = []
@@ -356,27 +307,34 @@ def ml_worker_cv_ldiv(experiment_num, verbose=False):
         sample_path = OUTPUT_BASE_PATH/'lDiv'/f'fold_{fold}'/f'k{k}'/f'l{l}'/'sample.csv'
         stats_file_path = OUTPUT_BASE_PATH/'lDiv'/f'fold_{fold}'/f'k{k}'/f'l{l}'/'stats.csv'
         test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
-        jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe)))
+        jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), QID_LIST, HIERARCHIES_BASE_PATH))
       reports = parallel_run_model_cv(jobs, non_generalized=False)
       calculate_mean_std(reports, avg_classification_report_output_path, TARGETS)
 
 
 if __name__ == '__main__':
-  config_path = 'config/nursery.ini'
+  config_path = sys.argv[1]
+  # config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
   # config_path = 'config/cmc.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645.ini'
   # config_path = 'config/income_binned_USA_1664500.ini'
   read_config(config_path)
-  print(TARGETS)
-  # generelization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
-  sample_stats(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET)
+
+  generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
+  sample_stats(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
   eq_per_target(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+
+  if PRIVACY_METRICS:
+      calculate_privacy_metrics('SSample', 'BSample')
+
+  for exp_number in EXP_NUMBERS:
+    # zou ik hier ook nog een pool kunnen maken? 
+    if ML:
+      ml_worker_cv_nonmasked(exp_number)
+      ml_worker_cv(exp_number, ['SSample', 'BSample'])
+      ml_worker_cv_ldiv(exp_number)
+    
   
-  # if PRIVACY_METRICS:
-  # 	calculate_privacy_metrics('RSample')
-  # if ML:
-  # 	# calculate_non_generalized_ml(True)
-  # 	# test_2()
-  # ml_worker_cv(1, ['SSample', 'BSample'])
-  # 	# ml_worker_cv_ldiv(1)
+  
+  
