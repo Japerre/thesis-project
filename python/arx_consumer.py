@@ -44,7 +44,7 @@ def read_config(config_path):
 
   # VARIABLES
   global NUM_PROCESSES, NUM_FOLDS, DATASET_NAME, K_LIST, B_LIST, L_LIST, TARGETS, EXP_NUMBERS
-  NUM_PROCESSES = cfg.getint('VARIABLES', 'num_processes')
+  # NUM_PROCESSES = cfg.getint('VARIABLES', 'num_processes')
   NUM_FOLDS = cfg.getint('VARIABLES', 'num_folds')
   DATASET_NAME= cfg['VARIABLES']['dataset_name']
   
@@ -314,6 +314,8 @@ def ml_worker_cv_ldiv(experiment_num, verbose=False):
 
 if __name__ == '__main__':
   config_path = sys.argv[1]
+  NUM_PROCESSES = sys.argv[2]
+  
   # config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
   # config_path = 'config/cmc.ini'
@@ -325,15 +327,15 @@ if __name__ == '__main__':
   sample_stats(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
   eq_per_target(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
 
-  if PRIVACY_METRICS:
-      calculate_privacy_metrics('SSample', 'BSample')
+  # if PRIVACY_METRICS:
+  #     calculate_privacy_metrics('SSample', 'BSample')
 
-  for exp_number in EXP_NUMBERS:
-    # zou ik hier ook nog een pool kunnen maken? 
-    if ML:
-      ml_worker_cv_nonmasked(exp_number)
-      ml_worker_cv(exp_number, ['SSample', 'BSample'])
-      ml_worker_cv_ldiv(exp_number)
+  # for exp_number in EXP_NUMBERS:
+  #   # zou ik hier ook nog een pool kunnen maken? 
+  #   if ML:
+  #     ml_worker_cv_nonmasked(exp_number)
+  #     ml_worker_cv(exp_number, ['SSample', 'BSample'])
+  #     ml_worker_cv_ldiv(exp_number)
     
   
   
