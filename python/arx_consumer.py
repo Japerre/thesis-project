@@ -7,6 +7,7 @@ import shutil
 import json
 from pprint import pprint
 from multiprocessing import Pool
+from tqdm import tqdm
 
 from imblearn.pipeline import Pipeline
 from sklearn.metrics import classification_report
@@ -250,10 +251,10 @@ def run_model_cv_non_generalized(params):
   save_ml_experiment(fold_path/'ml_experiments'/f'experiment_{experiment_num}', pipe, report)
   return report
 
-def parallel_run_model_cv(jobs, non_generalized):
+def parallel_run_model_cv(jobs, non_generalized, progressbar_desc=''):
   target_func = run_model_cv_non_generalized if non_generalized else run_model_cv
   with Pool(processes=NUM_PROCESSES) as pool:
-	  return list(pool.imap(target_func, jobs))
+	  return list(tqdm(pool.imap(target_func, jobs),total=len(jobs),desc=progressbar_desc))
 
 def ml_worker_cv_nonmasked(experiment_num, verbose=False):
   pipes_tuple = get_pipelines(experiment_num)
@@ -269,7 +270,7 @@ def ml_worker_cv_nonmasked(experiment_num, verbose=False):
       for fold in range(NUM_FOLDS):
         fold_path = FOLDS_PATH/f'fold_{fold}'
         jobs.append((experiment_num, fold_path, TARGET, deepcopy(pipes[i])))
-      reports = parallel_run_model_cv(jobs, non_generalized=True)
+      reports = parallel_run_model_cv(jobs, non_generalized=True, progressbar_desc=f'non_generalized: True')
       calculate_mean_std(reports, output_paths[i], TARGETS)
   else:
     pipe, non_masked_pipe = pipes_tuple
@@ -278,7 +279,7 @@ def ml_worker_cv_nonmasked(experiment_num, verbose=False):
     for fold in range(NUM_FOLDS):
       fold_path = FOLDS_PATH/f'fold_{fold}'
       jobs.append((experiment_num, fold_path, TARGET, deepcopy(non_masked_pipe)))
-    reports = parallel_run_model_cv(jobs, non_generalized=True)
+    reports = parallel_run_model_cv(jobs, non_generalized=True, progressbar_desc=f'non_generalized: True')
     calculate_mean_std(reports, output_path, TARGETS)
 
 def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
@@ -293,7 +294,7 @@ def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
           stats_file_path = get_stats_file(f'k{k}', fold)
           test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
           jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), QID_LIST, HIERARCHIES_BASE_PATH))
-        reports = parallel_run_model_cv(jobs, non_generalized=False)
+        reports = parallel_run_model_cv(jobs, non_generalized=False, progressbar_desc=f'strat: {strat}, k: {k}, b: {b}')
         calculate_mean_std(reports, avg_classification_report_output_path, TARGETS)
 
 
@@ -308,13 +309,13 @@ def ml_worker_cv_ldiv(experiment_num, verbose=False):
         stats_file_path = OUTPUT_BASE_PATH/'lDiv'/f'fold_{fold}'/f'k{k}'/f'l{l}'/'stats.csv'
         test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
         jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), QID_LIST, HIERARCHIES_BASE_PATH))
-      reports = parallel_run_model_cv(jobs, non_generalized=False)
+      reports = parallel_run_model_cv(jobs, non_generalized=False, progressbar_desc=f'strat: l-diversity, k: {k}, l: {l} ')
       calculate_mean_std(reports, avg_classification_report_output_path, TARGETS)
 
 
 if __name__ == '__main__':
   config_path = sys.argv[1]
-  NUM_PROCESSES = sys.argv[2]
+  NUM_PROCESSES = int(sys.argv[2])
   
   # config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
@@ -323,19 +324,19 @@ if __name__ == '__main__':
   # config_path = 'config/income_binned_USA_1664500.ini'
   read_config(config_path)
 
-  generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
-  sample_stats(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
-  eq_per_target(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  #generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
+  #sample_stats(['SSAMPLE', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  #eq_per_target(['SSAMPLE', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
 
-  # if PRIVACY_METRICS:
-  #     calculate_privacy_metrics('SSample', 'BSample')
+  if PRIVACY_METRICS:
+      calculate_privacy_metrics('SSAMPLE', 'BSample')
 
-  # for exp_number in EXP_NUMBERS:
-  #   # zou ik hier ook nog een pool kunnen maken? 
-  #   if ML:
-  #     ml_worker_cv_nonmasked(exp_number)
-  #     ml_worker_cv(exp_number, ['SSample', 'BSample'])
-  #     ml_worker_cv_ldiv(exp_number)
+  for exp_number in EXP_NUMBERS:
+    # zou ik hier ook nog een pool kunnen maken? 
+    if ML:
+      ml_worker_cv_nonmasked(exp_number)
+      ml_worker_cv(exp_number, ['SSAMPLE', 'BSample'])
+      ml_worker_cv_ldiv(exp_number)
     
   
   
