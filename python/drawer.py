@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 from configparser import ConfigParser, ExtendedInterpolation
 from pathlib import Path
@@ -11,6 +12,8 @@ from sklearn.ensemble import GradientBoostingClassifier
 from joblib import load
 from fractions import Fraction
 from pprint import pprint
+from multiprocessing import Pool
+from tqdm import tqdm
 
 
 BETA = '\u03B2'
@@ -53,29 +56,78 @@ def ASCIncome_target_names():
 		"[100000-inf[": "rich"
 	}
 
-def save_privacy_plots():
-	privacy_folder_paths = []
-	for foldername, subfolders, filenames in os.walk(OUTPUT_BASE_PATH):
-		if(Path(foldername).name == 'privacystats'):
-			privacy_folder_paths.append(foldername)
-	
-	for folder in privacy_folder_paths:
-		# Define the paths
-		certainty_path = os.path.join(folder, "certainty.csv")
-		journalist_risk_path = os.path.join(folder, "journalistRisk.csv")
-		certainty_plot_path = os.path.join(folder, "certainty.png")
-		journalist_risk_plot_path = os.path.join(folder, "journalistRisk.png")
 
-		data = pd.read_csv(certainty_path, decimal=',', sep=';')
-		sns.violinplot(y=data['0'], cut=0)  
-		plt.savefig(certainty_plot_path, bbox_inches='tight', dpi=300)
-		plt.close()
-		data = pd.read_csv(journalist_risk_path, decimal=',', sep=';')
-		sns.violinplot(y=data['0'], cut=0)  
-		plt.savefig(journalist_risk_plot_path, bbox_inches='tight', dpi=300)
-		plt.close()
-	
+def certainty_plots_balanced_sample_v2(fold_number, k, b):
+	bsample_v1_certainty_path = OUTPUT_BASE_PATH/f'BSample/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
+	bsample_v2_certainty_path = OUTPUT_BASE_PATH/f'BSample_v2/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
 
+	bsample_data = pd.read_csv(bsample_v1_certainty_path, sep=';', decimal=',')
+	bsample_v2_data = pd.read_csv(bsample_v2_certainty_path, sep=';', decimal=',')
+
+	# Combine data into one DataFrame with a 'version' column
+	bsample_data['version'] = 'bsample_v1'
+	bsample_v2_data['version'] = 'bsample_v2'
+	combined_data = pd.concat([bsample_data, bsample_v2_data])
+
+	# Create the violin plot with seaborn
+	sns.violinplot(x='version', y='0', data=combined_data, cut=0)
+	plt.xlabel('')
+	plt.ylabel('certainty')
+	plt.title(f'stratified balanced sampling voor k={k}, {BETA}={b}')
+	
+	# Save the plot
+	plt.show()
+
+
+def privacy_plot(params):
+	privacy_metric_path, privacy_metric_output_plot_path = params
+	data = pd.read_csv(privacy_metric_path, sep=';', decimal=',')
+	sns.violinplot(y=data['0'], cut=0)
+	plt.savefig(privacy_metric_output_plot_path, bbox_inches='tight', dpi=300)
+	plt.close()
+
+def privacy_plots_worker(sample_strats: list, certainty=False, journalist_risk=False):
+	jobs = []
+	for sample_strat in sample_strats:
+		sample_strat_base_path = OUTPUT_BASE_PATH/sample_strat
+		privacy_folder_paths = []
+		for foldername, subfolders, filenames in os.walk(sample_strat_base_path):
+			if(Path(foldername).name == 'privacystats'):
+				privacy_folder_paths.append(foldername)
+		for folder in privacy_folder_paths:
+			if certainty:
+				certainty_path = os.path.join(folder, "certainty.csv")
+				certainty_plot_path = os.path.join(folder, "certainty.png")
+				jobs.append((certainty_path, certainty_plot_path))
+			if journalist_risk:
+				journalist_risk_path = os.path.join(folder, "journalistRisk.csv")
+				journalist_risk_plot_path = os.path.join(folder, "journalistRisk.png")
+				jobs.append((journalist_risk_path, journalist_risk_plot_path))
+	with Pool(processes=NUM_PROCESSES) as pool:
+	  return list(tqdm(pool.imap(privacy_plot, jobs),total=len(jobs),desc='plotting privacy plots'))
+
+def violin_plots(fold, k, metric, sample_strat):
+	all_data = pd.DataFrame()
+
+	# Collect data
+	for b in B_LIST:
+			base_path = OUTPUT_BASE_PATH / sample_strat / f'fold_{fold}' / f'k{k}'
+			privacy_metric_path = base_path / f'B({b})' / 'privacystats' / f'{metric}.csv'
+			df = pd.read_csv(privacy_metric_path, decimal=',', sep=';')
+			df['B'] = b  # Add a column to indicate the B value for this dataset
+			all_data = pd.concat([all_data, df], ignore_index=True)
+
+	# Plotting
+	plt.figure(figsize=(10, 6))  # Adjust the figure size as needed
+	sns.violinplot(x='B', y='0', data=all_data, cut=0)  # Replace 'your_column_name' with the name of the column you want to plot
+
+	plt.title(f'Violin Plot of {metric} by B Value for {sample_strat}, k={k}, fold={fold}')
+	plt.xlabel('B Value')
+	plt.ylabel(metric)  # Adjust labels as needed
+	plt.xticks(rotation=45)  # In case B values are not nicely numbered or if there are many B values
+
+	plt.tight_layout()
+	plt.show()	
 
 def grouped_bar_chart(sample_strats: list, experiment_num, plot_non_masked: bool):
 	for sample_strat in sample_strats:
@@ -316,18 +368,28 @@ def cmp_balancing_pre_post(
 	plt.close()
 
 
+def test():
+	df = pd.read_csv(r'C:\Users\tibol\Desktop\FIIW Tibo Laperre\fase 5 - thesis\thesis-projectV3\data\results\ACSIncome_USA_2018_binned_imbalanced_1664500\BSample\fold_0\k5\B(0.5)\B(0.5)_sample.csv', sep=';', decimal=',')
+	# print(df)
+
+NUM_PROCESSES = None
+
 if __name__ == '__main__':
+	NUM_PROCESSES = int(sys.argv[1])
 	# config_path = 'config/cmc.ini'
-	config_path = 'config/nursery.ini'
+	# config_path = 'config/nursery.ini'
 	# config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-	# config_path = 'config/income_binned_USA_1664500.ini'
+	config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
-	# save_privacy_plots()
+	# test()
+	# violin_plots(0, 10, 'certainty', 'BSAMPLE')
+	# privacy_plots_worker(['BSample'], certainty=True, journalist_risk=True)
+	certainty_plots_balanced_sample_v2(0, 5, 0.125)
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
+	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=ASCIncome_target_names(), plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=cmc_target_names(), plot_std=True)
-	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=cmc_target_names(), plot_std=True)
-	grouped_bar_chart_big_image(['BSAMPLE'], 1, plot_std=True)
+	# grouped_bar_chart_big_image(['SSAMPLE','BSAMPLE'], 1, plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(
 	# 	sample_strats=['SSAMPLE', 'BSAMPLE', 'RSAMPLE'], 

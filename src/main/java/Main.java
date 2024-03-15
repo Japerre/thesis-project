@@ -12,26 +12,45 @@ import sampling.Samplers;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
+
+import static io.Utils.*;
 
 public class Main {
 
     static Configuration cfg;
     static int numberOfThreads;
     static int NUMBER_OF_FOLDS;
-    static int[] kValues = {5, 10, 20, 40, 80, 160};
-    static double[] sampleRates = {0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625};
-    static double[] lValues = {1, 1.25, 1.5, 1.75, 2, 2.25};
+    static int[] kValues;
+    static double[] sampleRates;
+    static double[] lValues;
+    static String[] qid;
 
-    private static void readProgramConfig(String configFilePath) throws ConfigurationException {
+    private static void readProgramConfig(String configFilePath) throws ConfigurationException, FileNotFoundException {
         Configurations configs = new Configurations();
         cfg = configs.properties(new File(configFilePath));
-//        numberOfThreads = 6;
-        NUMBER_OF_FOLDS = 10;
+
+        kValues = Arrays.stream(cfg.getString("k_values").split(";"))
+                .mapToInt(Integer::parseInt)
+                .toArray();
+
+        sampleRates = Arrays.stream(cfg.getString("b_values").split(";"))
+                .mapToDouble(Double::parseDouble)
+                .toArray();
+
+        lValues = Arrays.stream(cfg.getString("l_values").split(";"))
+                .mapToDouble(Double::parseDouble)
+                .toArray();
+
+        qid = getQID(cfg.getString("inputDataDefinitionPath"));
+
+        NUMBER_OF_FOLDS = Integer.parseInt(cfg.getString("numberOfFolds"));
     }
 
     public static void runKAnon() throws IOException {
+
         String experimentBasePath = OutputWriter.makeExperimentDirectory(cfg);
         String kAnonBasePath = OutputWriter.makeKanonDirectory(cfg);
         String hierarchiesPath = OutputWriter.makeHierarchiesDirectory(cfg);
@@ -60,12 +79,11 @@ public class Main {
         } finally {
             executorService.shutdown();
         }
-        OutputWriter.writeExperimentStats(kValues, sampleRates, cfg);
+        OutputWriter.writeExperimentStats2(kValues, sampleRates, lValues, qid, cfg);
     }
 
     public static void runEntropyLDiversity() throws IOException {
         String lDiversityPath = OutputWriter.makeLdiversityDirectory(cfg);
-
         ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
         List<Future<Long>> futures = new ArrayList<>();
 
@@ -94,21 +112,18 @@ public class Main {
     }
 
     public static void runPostSample(Samplers samplerType) throws IOException, InterruptedException, ExecutionException {
-//        double[] sampleRates = {0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625};
-        InputReader.SampleInput sampleInput = InputReader.readSampleInput(cfg.getString("experimentStatsFile"), cfg);
-        String target = InputReader.getTarget(cfg.getString("inputDataDefenitionPath"));
-
-        String sampleBasePath = OutputWriter.makeSampleDirectory(sampleInput.experimentBasePath, samplerType.getSamplerFolderName());
-
+        String target = InputReader.getTarget(cfg.getString("inputDataDefinitionPath"));
+        String sampleBasePath = OutputWriter.makeSampleDirectory(cfg.getString("experimentBasePath"), samplerType.getSamplerFolderName());
         ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
         List<Future<Long>> futures = new ArrayList<>();
 
         try {
             for (int foldNumber = 0; foldNumber < NUMBER_OF_FOLDS; foldNumber++) {
-                for (int k : sampleInput.kArr) {
+                for (int k : kValues) {
                     for (double sampleRate : sampleRates) {
                         SamplerStrategy samplerStrategy = samplerType.getSamplerStrategy(sampleRate, target);
-                        PostSampleRun postSampleRun = new PostSampleRun(new Sampler(samplerStrategy), k, sampleRate, sampleInput, sampleBasePath, foldNumber);
+                        PostSampleRun postSampleRun = new PostSampleRun(new Sampler(samplerStrategy), sampleBasePath, k, sampleRate, foldNumber, cfg);
+//                        PostSampleRun postSampleRun = new PostSampleRun(new Sampler(samplerStrategy), k, sampleRate, sampleInput, sampleBasePath, foldNumber);
                         futures.add(executorService.submit(postSampleRun));
                     }
                 }
@@ -122,6 +137,23 @@ public class Main {
             }
         }
     }
+
+//    public static void runPostSampleSingleThreaded(Samplers samplerType) throws IOException {
+//        InputReader.SampleInput sampleInput = InputReader.readSampleInput(cfg.getString("experimentStatsFile"), cfg);
+//        String target = InputReader.getTarget(cfg.getString("inputDataDefinitionPath"));
+//
+//        String sampleBasePath = OutputWriter.makeSampleDirectory(sampleInput.experimentBasePath, samplerType.getSamplerFolderName());
+//
+//        for (int foldNumber = 0; foldNumber < NUMBER_OF_FOLDS; foldNumber++) {
+//            for (int k : sampleInput.kArr) {
+//                for (double sampleRate : sampleRates) {
+//                    SamplerStrategy samplerStrategy = samplerType.getSamplerStrategy(sampleRate, target);
+//                    PostSampleRun postSampleRun = new PostSampleRun(new Sampler(samplerStrategy), k, sampleRate, sampleInput, sampleBasePath, foldNumber);
+//                    postSampleRun.run();
+//                }
+//            }
+//        }
+//    }
 
     public static void makeFolds(String pythonEnvPath) throws InterruptedException, IOException {
         String inputDataFile = cfg.getString("inputDataFile");
@@ -160,6 +192,8 @@ public class Main {
 //        String configFilePath = "src/config/ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.properties";
 //        String configFilePath = "src/config/cmc.properties";
         readProgramConfig(configFilePath);
+
+
         if (cfg.getBoolean("crossValidate")) {
             makeFolds(pythonEnvPath);
         }

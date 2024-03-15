@@ -1,7 +1,6 @@
 package experiment;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.Config;
 import io.InputReader;
@@ -13,15 +12,14 @@ import org.deidentifier.arx.*;
 import org.deidentifier.arx.metric.Metric;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.Callable;
+
+import static io.Utils.*;
 
 public class KanonRun implements Callable {
 
@@ -69,6 +67,26 @@ public class KanonRun implements Callable {
         }
     }
 
+    private void printSettings2(ARXResult result) throws IOException {
+        File settingsFile = new File(kDir, "settings.json");
+
+        List<String> QID = new ArrayList<>(result.getDataDefinition().getQuasiIdentifyingAttributes());
+        List<String> IS = new ArrayList<>(result.getDataDefinition().getInsensitiveAttributes());
+        List<String> S = new ArrayList<>(result.getDataDefinition().getSensitiveAttributes());
+
+        JsonObject settings = new JsonObject();
+        settings.add("QID", convertListToJsonArray(QID));
+        settings.add("IS", convertListToJsonArray(IS));
+        settings.add("S", convertListToJsonArray(S));
+        settings.addProperty("target", target);
+        settings.addProperty("privacy criteria", k + "-anonymity");
+
+        try (FileWriter writer = new FileWriter(settingsFile)) {
+            Gson gson = new Gson();
+            gson.toJson(settings, writer);
+        }
+    }
+
     private void printStats(ARXResult result) {
         File stats = new File(kDir, "stats.csv");
 
@@ -103,14 +121,34 @@ public class KanonRun implements Callable {
     }
 
 
+
+    private void printStats2(ARXResult result) throws IOException {
+        File statsFile = new File(kDir, "stats.json");
+
+        JsonObject stats = new JsonObject();
+        stats.add("node", convertArrayToJsonArray(result.getOutput().getTransformation().getTransformation()));
+        stats.add("QID", convertListToJsonArray(List.of(result.getOutput().getTransformation().getQuasiIdentifyingAttributes())));
+        stats.addProperty("suppressed in sample", result.getOutput().getView().getStatistics().getEquivalenceClassStatistics().getNumberOfSuppressedRecords());
+        stats.addProperty("sample size", result.getOutput().getNumRows() - result.getOutput().getView().getStatistics().getEquivalenceClassStatistics().getNumberOfSuppressedRecords());
+        stats.addProperty("input size", result.getOutput().getNumRows());
+        stats.addProperty("equivalence classes", result.getOutput().getStatistics().getEquivalenceClassStatistics().getNumberOfEquivalenceClasses());
+        stats.addProperty("average EQ size", result.getOutput().getStatistics().getEquivalenceClassStatistics().getAverageEquivalenceClassSize());
+
+        try (FileWriter writer = new FileWriter(statsFile)) {
+            Gson gson = new Gson();
+            gson.toJson(stats, writer);
+        }
+    }
+
+
     private void saveResults(ARXResult result) throws IOException {
-        printSettings(result);
-        printStats(result);
+        printSettings2(result);
+        printStats2(result);
         result.getOutput().save(kAnonFile);
     }
 
     public void run() throws IOException {
-        ImmutablePair<Data, String> immutablePair = InputReader.loadData(config.getString("inputDataDefenitionPath"), trainFilePath, false);
+        ImmutablePair<Data, String> immutablePair = InputReader.loadData(config.getString("inputDataDefinitionPath"), trainFilePath, false);
         Data data = immutablePair.getLeft();
         target = immutablePair.getRight();
         ARXAnonymizer anonymizer = new ARXAnonymizer();

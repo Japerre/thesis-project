@@ -1,17 +1,20 @@
 package experiment;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import io.Config;
 import io.InputReader;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.configuration2.Configuration;
 import org.deidentifier.arx.*;
 import sampling.Sampler;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.concurrent.Callable;
 
 public class PostSampleRun implements Callable<Long> {
@@ -19,49 +22,39 @@ public class PostSampleRun implements Callable<Long> {
     private Sampler sampler;
     private int k;
     private double sampleRate;
-    private InputReader.SampleInput sampleInput;
+    private String kAnonBasePath;
     private String sampleBasePath;
+    private String inputDataDefinitionPath;
+    private String foldsDirPath;
     private int foldNumber;
 
-    public PostSampleRun(Sampler sampler, int k, double sampleRate, InputReader.SampleInput sampleInput, String sampleBasePath, int foldNumber) {
+
+    public PostSampleRun(Sampler sampler, String sampleBasePath, int k, double sampleRate, int foldNumber, Configuration cfg) {
         this.sampler = sampler;
         this.k = k;
         this.sampleRate = sampleRate;
-        this.sampleInput = sampleInput;
-        this.sampleBasePath = sampleBasePath;
         this.foldNumber = foldNumber;
+        this.sampleBasePath = sampleBasePath;
+        this.kAnonBasePath = cfg.getString("kAnonBasePath");
+        this.sampleBasePath =
+        this.foldsDirPath = cfg.getString("foldsPath");
+        this.inputDataDefinitionPath = cfg.getString("inputDataDefinitionPath");
     }
 
-    private void setGeneralizationLevels(Data data) throws IOException {
-        File statsFile = Path.of(sampleInput.kAnonFolderPath).resolve("fold_"+foldNumber).resolve("k"+k).resolve("stats.csv").toFile();
-        Reader statsFileReader = new FileReader(statsFile);
+    private void setGeneralizationLevels(Data data) throws FileNotFoundException {
+        File statsFile = Path.of(kAnonBasePath).resolve("fold_"+foldNumber).resolve("k"+k).resolve("stats.json").toFile();
+        FileReader fileReader = new FileReader(statsFile);
+        Gson gson = new Gson();
+        JsonObject jsonObject = gson.fromJson(fileReader, JsonObject.class);
 
-        CSVFormat csvFormatStatsFile = CSVFormat.DEFAULT.builder()
-                .setHeader("node", "QID", "suppressed in sample", "sample size", "input size", "equivalence classes", "average EQ size")
-                .setSkipHeaderRecord(true)
-                .setDelimiter(';')
-                .build();
+        int[] genLevels = gson.fromJson(jsonObject.getAsJsonArray("node"), int[].class);
+        String[] qid = gson.fromJson((jsonObject.getAsJsonArray("QID")), String[].class);
 
-        Iterable<CSVRecord> statsRecords = csvFormatStatsFile.parse(statsFileReader);
-
-        String QID = "";
-        String node = "";
-
-        for (CSVRecord record : statsRecords) {
-            node = record.get("node");
-            QID = record.get("QID");
+        for(int i=0;i<qid.length;i++){
+            data.getDefinition().setMinimumGeneralization(qid[i],genLevels[i]);
+            data.getDefinition().setMaximumGeneralization(qid[i],genLevels[i]);
         }
 
-        String[] QIDArr = QID.substring(1, QID.length() - 1).split(", ");
-        String[] nodeArr = node.substring(1, node.length() - 1).split(", ");
-        int[] levels = Arrays.stream(nodeArr)
-                .mapToInt(Integer::parseInt)
-                .toArray();
-
-        for(int i=0;i<QIDArr.length;i++){
-            data.getDefinition().setMinimumGeneralization(QIDArr[i],levels[i]);
-            data.getDefinition().setMaximumGeneralization(QIDArr[i],levels[i]);
-        }
 
     }
 
@@ -73,14 +66,15 @@ public class PostSampleRun implements Callable<Long> {
         Path samplePath = postSampleFolder.resolve("B("+sampleRate+")_sample.csv");
         Path rowsPath = postSampleFolder.resolve("B("+sampleRate+")_rows");
 
+
         result.getOutput().getView().save(samplePath.toFile());
-//        sampler.savePostSample(sampleBasePath); //? how to save the rows file
+//        sampler.savePostSample(postSampleFolder); //? how to save the rows file
 
     }
 
     public void run() throws IOException {
-        String trainSet = sampleInput.foldsDirPath+"/fold_"+foldNumber+"/train.csv";
-        ImmutablePair<Data, String> immutablePair = InputReader.loadData(sampleInput.inputDataDefenitionPath, trainSet, false);
+        String trainSet = foldsDirPath+"/fold_"+foldNumber+"/train.csv";
+        ImmutablePair<Data, String> immutablePair = InputReader.loadData(inputDataDefinitionPath, trainSet, false);
         Data data = immutablePair.getLeft();
         setGeneralizationLevels(data);
         ARXResult result = new ARXAnonymizer().anonymize(data, Config.getConfig(k));

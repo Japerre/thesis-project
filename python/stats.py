@@ -125,3 +125,37 @@ def eq_per_target(strats_to_run, k_list, b_list, num_folds, output_base_path, qi
 		eq_per_target_stats_path = output_base_path/'stats'/f'{strat}'/'eq_counts_per_target.csv'
 		eq_per_target_stats_path.parent.mkdir(parents=True, exist_ok=True)
 		result_df.to_csv(eq_per_target_stats_path, sep=';',index=False)
+
+def find_biggest_certainty(bsample_base_path, num_folds, k_list, b_list):
+	max_cert = 0
+	max_certainty_path = None
+	for k in k_list:
+		for b in b_list:
+			for fold in range(num_folds):
+				certainty_path = bsample_base_path/f'fold_{fold}'/f'k{k}'/f'B({b})'/'privacystats'/'certainty.csv'
+				certainty_df = pd.read_csv(certainty_path, decimal=',', sep=';')
+				local_max_cert = certainty_df['0'].max()
+				if local_max_cert > max_cert:
+					max_cert = local_max_cert
+					max_certainty_path = certainty_path
+	
+	print(max_certainty_path)
+	print(max_cert)
+
+def find_biggest_procentual_certainty(bsample_base_path, num_folds, k_list, b_list):
+	max_cert_procentual_diff = 0.0
+	max_certainty_procentual_diff_path = None
+	for k in k_list:
+		for b in b_list:
+			for fold in range(num_folds):
+				certainty_path = bsample_base_path/f'fold_{fold}'/f'k{k}'/f'B({b})'/'privacystats'/'certainty.csv'
+				certainty_df = pd.read_csv(certainty_path, decimal=',', sep=';')
+				local_max_cert = certainty_df['0'].max()
+				diff = (local_max_cert-b)/b
+				print(diff)
+				if diff > max_cert_procentual_diff:
+					max_cert_procentual_diff = diff
+					max_certainty_procentual_diff_path = certainty_path
+	
+	print(max_certainty_procentual_diff_path)
+	print(max_cert_procentual_diff)

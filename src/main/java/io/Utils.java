@@ -1,10 +1,16 @@
 package io;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import org.deidentifier.arx.AttributeType;
 import sampling.Grouper;
 
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
@@ -69,6 +75,46 @@ public class Utils {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
+    }
+
+
+    public static <T> JsonArray convertListToJsonArray(List<T> list){
+        JsonArray jsonArray = new JsonArray();
+        for (T item : list) {
+            jsonArray.add(item.toString());
+        }
+        return jsonArray;
+    }
+
+    public static JsonArray convertArrayToJsonArray(int[] array) {
+        JsonArray jsonArray = new JsonArray();
+        for (int item : array) {
+            jsonArray.add(item);
+        }
+        return jsonArray;
+    }
+
+    public static JsonArray convertArrayToJsonArray(double[] array) {
+        JsonArray jsonArray = new JsonArray();
+        for (double item : array) {
+            jsonArray.add(item);
+        }
+        return jsonArray;
+    }
+
+
+    public static String[] getQID(String inputDataDefinitionPath) throws FileNotFoundException {
+        FileReader fileReader = new FileReader(inputDataDefinitionPath);
+        Gson gson = new Gson();
+        JsonObject jsonObject = gson.fromJson(fileReader, JsonObject.class);
+
+        JsonArray qidArray = jsonObject.getAsJsonArray("QID");
+        String[] qid = new String[qidArray.size()];
+        for (int i = 0; i < qidArray.size(); i++) {
+            JsonObject qidObject = qidArray.get(i).getAsJsonObject();
+            qid[i] = qidObject.get("colName").getAsString();
+        }
+        return qid;
     }
 
 }

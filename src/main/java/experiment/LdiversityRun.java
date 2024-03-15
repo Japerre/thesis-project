@@ -109,7 +109,7 @@ public class LdiversityRun implements Callable<Long> {
     }
 
     public void run() throws IOException {
-        ImmutablePair<Data, String> immutablePair = InputReader.loadData(cfg.getString("inputDataDefenitionPath"), trainFilePath, true);
+        ImmutablePair<Data, String> immutablePair = InputReader.loadData(cfg.getString("inputDataDefinitionPath"), trainFilePath, true);
         Data data = immutablePair.getLeft();
         target = immutablePair.getRight();
         ARXAnonymizer anonymizer = new ARXAnonymizer();

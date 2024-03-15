@@ -16,9 +16,9 @@ import java.util.Arrays;
 
 public class InputReader {
 
-    public static ImmutablePair<Data, String> loadData(String inputDataDefenitionPath, String inputDataPath, boolean ldiv) throws IOException {
+    public static ImmutablePair<Data, String> loadData(String inputDataDefinitionPath, String inputDataPath, boolean ldiv) throws IOException {
 
-        FileReader fileReader = new FileReader(inputDataDefenitionPath);
+        FileReader fileReader = new FileReader(inputDataDefinitionPath);
         Gson gson = new Gson();
         JsonObject jsonObject = gson.fromJson(fileReader, JsonObject.class);
 
@@ -52,80 +52,11 @@ public class InputReader {
         return ImmutablePair.of(data, target);
     }
 
-    public static String getTarget(String inputDataDefenitionPath) throws FileNotFoundException {
-        FileReader fileReader = new FileReader(inputDataDefenitionPath);
+    public static String getTarget(String inputDataDefinitionPath) throws FileNotFoundException {
+        FileReader fileReader = new FileReader(inputDataDefinitionPath);
         Gson gson = new Gson();
         JsonObject jsonObject = gson.fromJson(fileReader, JsonObject.class);
         return jsonObject.get("target").getAsString();
-    }
-
-    public static SampleInput readSampleInput(String experimentStatsFile, Configuration cfg) throws IOException {
-        Reader in = new FileReader(experimentStatsFile);
-        String[] headers = {
-                "k",
-                "b",
-                "experimentBasePath",
-                "kAnonFolderPath",
-                "inputDatasetPath",
-                "inputDataDefenitionPath",
-                "inputDataDefenitionAbsolutePath",
-                "QID"
-        };
-        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-                .setHeader(headers)
-                .setSkipHeaderRecord(true)
-                .setDelimiter(';')
-                .build();
-        Iterable<CSVRecord> records = csvFormat.parse(in);
-
-        String kValues = "";
-        String experimentBasePath=""; String kAnonFolderPath=""; String inputDatasetPath=""; String inputDataDefenitionPath="";
-        for (CSVRecord record : records){
-            kValues = record.get("k");
-            experimentBasePath = record.get("experimentBasePath");
-            kAnonFolderPath = record.get("kAnonFolderPath");
-            inputDatasetPath = record.get("inputDatasetPath");
-            inputDataDefenitionPath= record.get("inputDataDefenitionPath");
-        }
-
-        // Remove brackets and split by ","
-        String[] values = kValues.substring(1, kValues.length() - 1).split(", ");
-
-        // Convert array to int array
-        int[] intArray = Arrays.stream(values)
-                .mapToInt(Integer::parseInt)
-                .toArray();
-
-        return new SampleInput(intArray, experimentBasePath, kAnonFolderPath, inputDatasetPath, inputDataDefenitionPath, cfg.getString("foldsPath"));
-
-    }
-
-    public static class SampleInput {
-        public final int[] kArr;
-        public final String experimentBasePath;
-        public final String kAnonFolderPath;
-        public final String inputDatasetPath;
-        public final String inputDataDefenitionPath;
-        public final String foldsDirPath;
-
-        public SampleInput(int[] kArr, String experimentBasePath, String kAnonFolderPath, String inputDatasetPath, String inputDataDefenitionPath, String foldsDirPath) {
-            this.kArr = kArr;
-            this.experimentBasePath = experimentBasePath;
-            this.kAnonFolderPath = kAnonFolderPath;
-            this.inputDatasetPath = inputDatasetPath;
-            this.inputDataDefenitionPath = inputDataDefenitionPath;
-            this.foldsDirPath = foldsDirPath;
-        }
-
-        @Override
-        public String toString() {
-            return "SampleInput{" +
-                    "kArr=" + Arrays.toString(kArr) +
-                    ", experimentBasePath='" + experimentBasePath + '\'' +
-                    ", kAnonFolderPath='" + kAnonFolderPath + '\'' +
-                    ", inputDatasetPath='" + inputDatasetPath + '\'' +
-                    '}';
-        }
     }
 
 }

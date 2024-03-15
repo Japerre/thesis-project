@@ -1,17 +1,19 @@
 package io;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import org.apache.commons.configuration2.Configuration;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
 
-import static io.Utils.copyDirectory;
+import static io.Utils.*;
+
 
 public class OutputWriter {
 
@@ -20,45 +22,80 @@ public class OutputWriter {
         FileUtils.copyDirectory(source.toFile(), destination.toFile());
     }
 
-    public static String writeExperimentStats(int[] kArr, double[] bArr, Configuration config) throws IOException {
-        File directory = new File(config.getString("outputBasePath"));
-        File experimentStatsFile = new File(config.getString("experimentStatsFile"));
-        String inputDatasetFolder = config.getString("inputDatasetFolder");
-        String experimentBasePath = config.getString("experimentBasePath");
-        String inputDataDefenitionPath = config.getString("inputDataDefenitionPath");
-        String inputDataDefenitionAbsolutePath = Paths.get(System.getProperty("user.dir")).resolve(inputDataDefenitionPath).toString();
+    public static String writeExperimentStats2(int[] kArr, double[] bArr, double[] lValues, String[] qid, Configuration cfg) throws IOException {
+        File directory = new File(cfg.getString("outputBasePath"));
+        File experimentStatsFile = new File(cfg.getString("experimentStatsFile"));
+        String inputDatasetFolder = cfg.getString("inputDatasetFolder");
+        String experimentBasePath = cfg.getString("experimentBasePath");
+        String inputDataDefinitionPath = cfg.getString("inputDataDefinitionPath");
+        String inputDataDefinitionAbsolutePath = Paths.get(System.getProperty("user.dir")).resolve(inputDataDefinitionPath).toString();
+        String kAnonBasePath = cfg.getString("kAnonBasePath");
+        Path inputDatasetPath = Paths.get(cfg.getString("inputDataFileFolder") + "train.csv");
 
-        String kAnonBasePath = config.getString("kAnonBasePath");
+        // Create a JsonObject to hold the data
+        JsonObject jsonObject = new JsonObject();
+        Gson gson = new Gson();
 
-        Path inputDatasetPath = Path.of(config.getString("inputDataFileFolder")+"train.csv");
+        jsonObject.add("k_values", convertArrayToJsonArray(kArr));
+        jsonObject.add("b_values", convertArrayToJsonArray(bArr));
+        jsonObject.add("l_values", convertArrayToJsonArray(lValues));
+        jsonObject.add("qid", convertListToJsonArray(List.of(qid)));
 
-        String[] headers = {"k", "b", "experimentBasePath", "kAnonFolderPath", "inputDatasetPath", "inputDataDefenitionPath", "inputDataDefenitionAbsolutePath", "QID"};
+        jsonObject.addProperty("experimentBasePath", experimentBasePath);
+        jsonObject.addProperty("kAnonFolderPath", kAnonBasePath);
+        jsonObject.addProperty("inputDatasetPath", inputDatasetPath.toString());
+        jsonObject.addProperty("inputDataDefinitionPath", inputDataDefinitionPath);
+        jsonObject.addProperty("inputDataDefinitionAbsolutePath", inputDataDefinitionAbsolutePath);
 
-        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-                .setHeader(headers)
-                .setDelimiter(';')
-                .build();
-
-        try (
-                FileWriter fileWriter = new FileWriter(experimentStatsFile);
-                CSVPrinter printer = new CSVPrinter(fileWriter, csvFormat);
-        ) {
-            printer.printRecord(
-                    Arrays.toString(kArr),
-                    Arrays.toString(bArr),
-                    experimentBasePath,
-                    kAnonBasePath,
-                    inputDatasetPath.toString(),
-                    inputDataDefenitionPath,
-                    inputDataDefenitionAbsolutePath,
-                    config.getString("qid")
-            );
+        // Write the JSON object to the file
+        try (FileWriter writer = new FileWriter(experimentStatsFile)) {
+            gson.toJson(jsonObject, writer);
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         return experimentStatsFile.getPath();
     }
+
+//    public static String writeExperimentStats(int[] kArr, double[] bArr, Configuration config) throws IOException {
+//        File directory = new File(config.getString("outputBasePath"));
+//        File experimentStatsFile = new File(config.getString("experimentStatsFile"));
+//        String inputDatasetFolder = config.getString("inputDatasetFolder");
+//        String experimentBasePath = config.getString("experimentBasePath");
+//        String inputDataDefenitionPath = config.getString("inputDataDefenitionPath");
+//        String inputDataDefenitionAbsolutePath = Paths.get(System.getProperty("user.dir")).resolve(inputDataDefenitionPath).toString();
+//
+//        String kAnonBasePath = config.getString("kAnonBasePath");
+//
+//        Path inputDatasetPath = Path.of(config.getString("inputDataFileFolder")+"train.csv");
+//
+//        String[] headers = {"k", "b", "experimentBasePath", "kAnonFolderPath", "inputDatasetPath", "inputDataDefenitionPath", "inputDataDefenitionAbsolutePath", "QID"};
+//
+//        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+//                .setHeader(headers)
+//                .setDelimiter(';')
+//                .build();
+//
+//        try (
+//                FileWriter fileWriter = new FileWriter(experimentStatsFile);
+//                CSVPrinter printer = new CSVPrinter(fileWriter, csvFormat);
+//        ) {
+//            printer.printRecord(
+//                    Arrays.toString(kArr),
+//                    Arrays.toString(bArr),
+//                    experimentBasePath,
+//                    kAnonBasePath,
+//                    inputDatasetPath.toString(),
+//                    inputDataDefenitionPath,
+//                    inputDataDefenitionAbsolutePath,
+//                    config.getString("qid")
+//            );
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//
+//        return experimentStatsFile.getPath();
+//    }
 
     public static String makeKanonDirectory(Configuration config) throws IOException {
         String kAnonBasePath = config.getString("kAnonBasePath");

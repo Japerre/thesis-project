@@ -9,6 +9,7 @@ from pprint import pprint
 from multiprocessing import Pool
 from tqdm import tqdm
 
+
 from imblearn.pipeline import Pipeline
 from sklearn.metrics import classification_report
 
@@ -18,53 +19,50 @@ from copy import deepcopy
 
 from configparser import ConfigParser, ExtendedInterpolation
 
-from stats import generalization_stats, sample_stats, eq_per_target
+from stats import generalization_stats, sample_stats, eq_per_target, find_biggest_certainty, find_biggest_procentual_certainty
+from bsampleV2 import BsampleV2
 
+NUM_PROCESSES = None
 
 def read_config(config_path):
-  global CONFIG_PATH
+  global CONFIG_PATH, CFG
   CONFIG_PATH = config_path
-  cfg = ConfigParser(interpolation=ExtendedInterpolation())
-  cfg.read(CONFIG_PATH)
+  CFG = ConfigParser(interpolation=ExtendedInterpolation())
+  CFG.read(CONFIG_PATH)
   
   # PATHS
-  global OUTPUT_BASE_PATH, EXPERIMENT_STATS_PATH, HIERARCHIES_BASE_PATH, TRAIN_DF_PATH, INPUT_DATA_DEFENITION_PATH, TEST_DF_PATH, K_ANON_BASE_PATH, FOLDS_PATH
-  OUTPUT_BASE_PATH = Path(cfg['PATHS']['output_base_path']).resolve()
+  global OUTPUT_BASE_PATH, EXPERIMENT_STATS_PATH, HIERARCHIES_BASE_PATH, INPUT_DATA_DEFINITION_PATH, K_ANON_BASE_PATH, FOLDS_PATH
+  OUTPUT_BASE_PATH = Path(CFG['PATHS']['output_base_path']).resolve()
   K_ANON_BASE_PATH = OUTPUT_BASE_PATH / 'kAnon'
-  EXPERIMENT_STATS_PATH = Path(cfg['PATHS']['experiment_stats_path']).resolve()
-  HIERARCHIES_BASE_PATH = Path(cfg['PATHS']['hierarchies_base_path']).resolve()
-  FOLDS_PATH = Path(cfg['PATHS']['folds_path']).resolve()
+  EXPERIMENT_STATS_PATH = Path(CFG['PATHS']['experiment_stats_path']).resolve()
+  INPUT_DATA_DEFINITION_PATH = Path(CFG['PATHS']['data_definition_path']).resolve()
+  HIERARCHIES_BASE_PATH = Path(CFG['PATHS']['hierarchies_base_path']).resolve()
+  FOLDS_PATH = Path(CFG['PATHS']['folds_path']).resolve()
 
   # BOOLEANS
   global MLBALANCE, PRIVACY_METRICS, ML, SAVE_TEST_GENERALIZED, APPEND_ML_EXPERIMENTS
-  MLBALANCE = cfg.getboolean('BOOLEANS', 'mlbalance')
-  PRIVACY_METRICS = cfg.getboolean('BOOLEANS', 'privacy_metrics')
-  ML = cfg.getboolean('BOOLEANS', 'ml')
-  SAVE_TEST_GENERALIZED = cfg.getboolean('BOOLEANS', 'save_test_generalized')
-  APPEND_ML_EXPERIMENTS = cfg.getboolean('BOOLEANS', 'append_ml_experiments')
+  MLBALANCE = CFG.getboolean('BOOLEANS', 'mlbalance')
+  PRIVACY_METRICS = CFG.getboolean('BOOLEANS', 'privacy_metrics')
+  ML = CFG.getboolean('BOOLEANS', 'ml')
+  SAVE_TEST_GENERALIZED = CFG.getboolean('BOOLEANS', 'save_test_generalized')
+  APPEND_ML_EXPERIMENTS = CFG.getboolean('BOOLEANS', 'append_ml_experiments')
 
   # VARIABLES
-  global NUM_PROCESSES, NUM_FOLDS, DATASET_NAME, K_LIST, B_LIST, L_LIST, TARGETS, EXP_NUMBERS
-  # NUM_PROCESSES = cfg.getint('VARIABLES', 'num_processes')
-  NUM_FOLDS = cfg.getint('VARIABLES', 'num_folds')
-  DATASET_NAME= cfg['VARIABLES']['dataset_name']
-  
-  K_LIST = [int(num) for num in cfg.get('VARIABLES', 'k_list').split(',')]
-  B_LIST = [float(num) for num in cfg.get('VARIABLES', 'b_list').split(',')]
-  L_LIST = [float(num) for num in cfg.get('VARIABLES', 'l_list').split(',')]
+  global NUM_FOLDS, DATASET_NAME, K_LIST, B_LIST, L_LIST, TARGETS, EXP_NUMBERS
+  NUM_FOLDS = CFG.getint('VARIABLES', 'num_folds')
+  DATASET_NAME= CFG['PATHS']['dataset_name']
+  K_LIST, B_LIST, L_LIST = get_run_params()
 
-  # K_LIST = [5, 10, 20, 40, 80, 160]
-  # B_LIST = [0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625]
-  # L_LIST = [1.0, 1.25, 1.5, 1.75, 2.0, 2.25]
-  TARGETS = cfg.get('VARIABLES', 'targets').split(',')
+  TARGETS = CFG.get('VARIABLES', 'targets').split(',')
   if DATASET_NAME == 'cmc':
     TARGETS = [int(target) for target in TARGETS]
-  EXP_NUMBERS = [int(num) for num in cfg.get('VARIABLES', 'experiment_numbers').split(',')]
+  EXP_NUMBERS = [int(num) for num in CFG.get('VARIABLES', 'experiment_numbers').split(',')]
 
   # OTHER
   global QID_LIST, CAT, NUM, TARGET
   QID_LIST = get_qid()
   CAT, NUM, TARGET = get_datatypes()
+
   
 def get_pipelines(experiment_num, verbose=False):
   if(DATASET_NAME=='cmc'):
@@ -76,8 +74,8 @@ def get_pipelines(experiment_num, verbose=False):
     elif experiment_num == 3:
       return experiment_3_pipeline(verbose, QID_LIST)
   
-  elif(DATASET_NAME=='ASCIncome'):
-    from pipelines.ASCIncome_pipelines import experiment_1_pipeline, experiment_3_pipeline
+  elif(DATASET_NAME=='ACSIncome'):
+    from pipelines.ACSIncome_pipelines import experiment_1_pipeline, experiment_3_pipeline
     if experiment_num == 1:
       return experiment_1_pipeline(verbose, QID_LIST, CAT)
     elif experiment_num == 2:
@@ -98,28 +96,73 @@ def get_xy_split(df_to_split: pd.DataFrame, target):
   x, y = df_to_split.drop(target, axis=1), df_to_split[target]
   return (x,y)
   
+def get_run_params():
+  with open(EXPERIMENT_STATS_PATH, 'r') as json_file:
+    stats = json.load(json_file)
+
+  return (stats.get('k_values'), stats.get('b_values'), stats.get('l_values'))
+
+def get_qid() -> list:
+  with open(EXPERIMENT_STATS_PATH, 'r') as json_file:
+    stats = json.load(json_file)
+  return stats.get('qid', [])
+  
 def get_datatypes():
-  experiment_stats = pd.read_csv(EXPERIMENT_STATS_PATH, delimiter=';')
-  global INPUT_DATA_DEFENITION_PATH
-  INPUT_DATA_DEFENITION_PATH = experiment_stats['inputDataDefenitionAbsolutePath'].to_list()[0]
-  with open(INPUT_DATA_DEFENITION_PATH, 'r') as json_file:
-    data_defenition = json.load(json_file)
-  cat = data_defenition.get('cat', [])
-  num = data_defenition.get('num', [])
-  target = data_defenition.get('target')
+  with open(INPUT_DATA_DEFINITION_PATH, 'r') as json_file:
+    data_definition = json.load(json_file)
+  cat = data_definition.get('cat', [])
+  num = data_definition.get('num', [])
+  target = data_definition.get('target')
   return (cat, num, target)
   
+def calculate_privacy_metrics(params):
+  population_path, sample_path, journalist_risk, certainty, privacystats_dir, qid_list = params
+  population_df = pd.read_csv(population_path, sep=';', decimal=',').astype(str)
+  sample_df = pd.read_csv(sample_path, delimiter=';')
+  if certainty:
+    certainty_distribution = calc_certainty(population_df, sample_df, qid_list)
+    certainty_distribution.to_csv(privacystats_dir / 'certainty.csv', sep=';', decimal=',', index=False)
 
-def certainty(population_df: pd.DataFrame, sample_df: pd.DataFrame, attributes: list) -> pd.Series:
-  population_eq = population_df.groupby(attributes).size()
-  sample_eq = sample_df.groupby(attributes).size()
+  if journalist_risk:
+    journalist_risk_distribution = calc_journalist_risk(population_df, sample_df, qid_list)
+    journalist_risk_distribution.to_csv(privacystats_dir / 'journalistRisk.csv', sep=';', decimal=',', index=False)
 
-  result = sample_eq.div(population_eq).fillna(0).reset_index(level=attributes)
-  result2 = sample_df.merge(result, on=attributes, how='left')
+
+def calculate_privacy_metrics_worker(sample_strategies, journalist_risk: bool, certainty: bool):
+  jobs = []
+  for sample_strat in sample_strategies:
+    for fold in range(NUM_FOLDS):
+      fold_path = OUTPUT_BASE_PATH/sample_strat/f'fold_{fold}'
+      samples = []
+      k_directories = [fold_path/d for d in os.listdir(fold_path) if d.startswith('k')]
+      for k_dir in k_directories:
+        population_path = K_ANON_BASE_PATH/f'fold_{fold}/{k_dir.name}/output_sample.csv'
+        dict = {'population_path': population_path, "sample_paths": []}
+        for sample_folder_name in os.listdir(k_dir):
+          dict['sample_paths'].append(Path(k_dir) / sample_folder_name / f'{sample_folder_name}_sample.csv')
+        samples.append(dict)
+
+      for dict in samples:
+        for sample_path in dict['sample_paths']:
+          privacystats_dir = sample_path.parent / 'privacystats'
+          if privacystats_dir.exists():
+            shutil.rmtree(privacystats_dir)
+          os.makedirs(privacystats_dir)
+          jobs.append((dict['population_path'], sample_path, journalist_risk, certainty, privacystats_dir, QID_LIST))
+  
+  with Pool(processes=NUM_PROCESSES) as pool:
+	  return list(tqdm(pool.imap(calculate_privacy_metrics, jobs),total=len(jobs),desc='calculating privacy metrics'))
+
+def calc_certainty(population_df: pd.DataFrame, sample_df: pd.DataFrame, qid: list) -> pd.Series:
+  population_eq = population_df.groupby(qid).size()
+  sample_eq = sample_df.groupby(qid).size()
+
+  result = sample_eq.div(population_eq).fillna(0).reset_index(level=qid)
+  result2 = sample_df.merge(result, on=qid, how='left')
   return result2[0]
 
 
-def journalist_risk(population_df: pd.DataFrame, sample_df: pd.DataFrame, attributes: list) -> pd.Series:
+def calc_journalist_risk(population_df: pd.DataFrame, sample_df: pd.DataFrame, attributes: list) -> pd.Series:
   population_eq = population_df.groupby(attributes).size().apply(lambda x: 1 / x).reset_index(level=attributes)
 
   result = sample_df.merge(population_eq, on=attributes, how='left').fillna(0)
@@ -127,14 +170,6 @@ def journalist_risk(population_df: pd.DataFrame, sample_df: pd.DataFrame, attrib
   result.iloc[suppressed_records.index, -1] = 0
   return result[result.columns[-1]]
 
-def read_attributes(settingsPath: str, attributeType: str) -> list:
-  settings = pd.read_csv(settingsPath, delimiter=';')
-  attributes = settings[attributeType].to_list()[0][1:-1].split(', ')
-  return attributes
-
-def get_qid() -> list:
-  experiment_stats = pd.read_csv(EXPERIMENT_STATS_PATH, delimiter=';')
-  return experiment_stats["QID"].to_list()[0][1:-1].split(', ')
 
 def get_generalised(dataset: pd.DataFrame, stats_file: Path, qid_list, hierarchies_base_path) -> pd.DataFrame:
   dataset = dataset.copy()
@@ -154,35 +189,6 @@ def get_stats_file(k_dir_name: str, fold_num=None):
     return K_ANON_BASE_PATH / k_dir_name / 'stats.csv'
   else:
     return K_ANON_BASE_PATH / f'fold_{fold_num}' / k_dir_name / 'stats.csv'
-
-def calculate_privacy_metrics(sample_strategy):
-  sample_base_path = OUTPUT_BASE_PATH / sample_strategy
-
-  samples = []
-  k_directories = [sample_base_path / d for d in os.listdir(sample_base_path)]
-
-  for k_dir in k_directories:
-    k_stats_file_path = OUTPUT_BASE_PATH / 'kAnon' / k_dir.name / 'stats.csv'
-    dict = {'stats_file_path': k_stats_file_path, "sample_paths": []}
-    for sample_folder_name in os.listdir(k_dir):
-      dict['sample_paths'].append(Path(k_dir) / sample_folder_name / f'{sample_folder_name}_sample.csv')
-    samples.append(dict)
-
-  for dict in samples:
-    population_df_generalized = get_generalised(POPULATION_DF, dict['stats_file_path'])
-    for sample_path in dict['sample_paths']:
-      privacystats_dir = sample_path.parent / 'privacystats'
-      if privacystats_dir.exists():
-        shutil.rmtree(privacystats_dir)
-      os.makedirs(privacystats_dir)
-      
-      sample_df = pd.read_csv(sample_path, delimiter=';')
-      certainty_distribution = certainty(population_df_generalized, sample_df, QID_LIST)
-      certainty_distribution.to_csv(privacystats_dir / 'certainty.csv', sep=';', decimal=',', index=False)
-      
-      journalist_risk_distribution = journalist_risk(population_df_generalized, sample_df, QID_LIST)
-      journalist_risk_distribution.to_csv(privacystats_dir / 'journalistRisk.csv', sep=';', decimal=',', index=False)
-  
 
 def save_ml_experiment(experiment_dir: Path, pipe: Pipeline, report):
   if experiment_dir.exists():
@@ -319,24 +325,28 @@ if __name__ == '__main__':
   
   # config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
-  # config_path = 'config/cmc.ini'
+  config_path = 'config/cmc.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-  # config_path = 'config/income_binned_USA_1664500.ini'
+  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
   read_config(config_path)
 
-  #generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
-  #sample_stats(['SSAMPLE', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
-  #eq_per_target(['SSAMPLE', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  # generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
+  # sample_stats(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  # eq_per_target(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
 
-  if PRIVACY_METRICS:
-      calculate_privacy_metrics('SSAMPLE', 'BSample')
+  # if PRIVACY_METRICS:
+  #     calculate_privacy_metrics_worker(['BSample'], journalist_risk=False, certainty=True)
 
-  for exp_number in EXP_NUMBERS:
-    # zou ik hier ook nog een pool kunnen maken? 
-    if ML:
-      ml_worker_cv_nonmasked(exp_number)
-      ml_worker_cv(exp_number, ['SSAMPLE', 'BSample'])
-      ml_worker_cv_ldiv(exp_number)
+  # bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'BSample', 
+  #                         K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
+  # bsampler_v2.run()  
+
+  # for exp_number in EXP_NUMBERS:
+  #   # zou ik hier ook nog een pool kunnen maken? 
+  #   if ML:
+  #     # ml_worker_cv_nonmasked(exp_number)
+  #     ml_worker_cv(exp_number, ['BSample_v2'])
+  #     # ml_worker_cv_ldiv(exp_number)
     
   
   
