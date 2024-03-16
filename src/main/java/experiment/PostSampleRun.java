@@ -1,12 +1,9 @@
 package experiment;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.Config;
 import io.InputReader;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.configuration2.Configuration;
 import org.deidentifier.arx.*;
@@ -36,7 +33,7 @@ public class PostSampleRun implements Callable<Long> {
         this.foldNumber = foldNumber;
         this.sampleBasePath = sampleBasePath;
         this.kAnonBasePath = cfg.getString("kAnonBasePath");
-        this.sampleBasePath =
+        this.sampleBasePath = sampleBasePath;
         this.foldsDirPath = cfg.getString("foldsPath");
         this.inputDataDefinitionPath = cfg.getString("inputDataDefinitionPath");
     }
@@ -55,7 +52,6 @@ public class PostSampleRun implements Callable<Long> {
             data.getDefinition().setMaximumGeneralization(qid[i],genLevels[i]);
         }
 
-
     }
 
     private void savePostSample(ARXResult result) throws IOException {
@@ -66,10 +62,8 @@ public class PostSampleRun implements Callable<Long> {
         Path samplePath = postSampleFolder.resolve("B("+sampleRate+")_sample.csv");
         Path rowsPath = postSampleFolder.resolve("B("+sampleRate+")_rows");
 
-
         result.getOutput().getView().save(samplePath.toFile());
 //        sampler.savePostSample(postSampleFolder); //? how to save the rows file
-
     }
 
     public void run() throws IOException {

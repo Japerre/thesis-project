@@ -32,10 +32,14 @@ def read_config(config_path):
 
 	#OTHER
 	global DATASET_NAME, K_LIST, B_LIST, L_LIST
-	DATASET_NAME = cfg['VARIABLES']['dataset_name']
-	K_LIST = [5, 10, 20, 40, 80, 160]
-	B_LIST = [0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625]
-	L_LIST = [1.0, 1.25, 1.5, 1.75, 2.0, 2.25]
+	DATASET_NAME = cfg['PATHS']['dataset_name']
+	K_LIST, B_LIST, L_LIST = get_run_params()
+
+
+def get_run_params():
+  with open(EXPERIMENT_STATS_PATH, 'r') as json_file:
+    stats = json.load(json_file)
+  return (stats.get('k_values'), stats.get('b_values'), stats.get('l_values'))
 
 def get_test_generalized(k_dir_name: str) -> (pd.DataFrame, pd.DataFrame):
 	test_generalized_path = K_ANON_BASE_PATH / k_dir_name / 'test_generalized'
@@ -376,19 +380,19 @@ NUM_PROCESSES = None
 
 if __name__ == '__main__':
 	NUM_PROCESSES = int(sys.argv[1])
-	# config_path = 'config/cmc.ini'
+	config_path = 'config/cmc.ini'
 	# config_path = 'config/nursery.ini'
 	# config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-	config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
 	# test()
 	# violin_plots(0, 10, 'certainty', 'BSAMPLE')
 	# privacy_plots_worker(['BSample'], certainty=True, journalist_risk=True)
-	certainty_plots_balanced_sample_v2(0, 5, 0.125)
+	# certainty_plots_balanced_sample_v2(0, 5, 0.125)
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=ASCIncome_target_names(), plot_std=True)
-	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=cmc_target_names(), plot_std=True)
+	grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, target_translation_dict=cmc_target_names(), plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE','BSAMPLE'], 1, plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(

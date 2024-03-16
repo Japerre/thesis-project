@@ -123,7 +123,6 @@ public class Main {
                     for (double sampleRate : sampleRates) {
                         SamplerStrategy samplerStrategy = samplerType.getSamplerStrategy(sampleRate, target);
                         PostSampleRun postSampleRun = new PostSampleRun(new Sampler(samplerStrategy), sampleBasePath, k, sampleRate, foldNumber, cfg);
-//                        PostSampleRun postSampleRun = new PostSampleRun(new Sampler(samplerStrategy), k, sampleRate, sampleInput, sampleBasePath, foldNumber);
                         futures.add(executorService.submit(postSampleRun));
                     }
                 }
@@ -138,22 +137,20 @@ public class Main {
         }
     }
 
-//    public static void runPostSampleSingleThreaded(Samplers samplerType) throws IOException {
-//        InputReader.SampleInput sampleInput = InputReader.readSampleInput(cfg.getString("experimentStatsFile"), cfg);
-//        String target = InputReader.getTarget(cfg.getString("inputDataDefinitionPath"));
-//
-//        String sampleBasePath = OutputWriter.makeSampleDirectory(sampleInput.experimentBasePath, samplerType.getSamplerFolderName());
-//
-//        for (int foldNumber = 0; foldNumber < NUMBER_OF_FOLDS; foldNumber++) {
-//            for (int k : sampleInput.kArr) {
-//                for (double sampleRate : sampleRates) {
-//                    SamplerStrategy samplerStrategy = samplerType.getSamplerStrategy(sampleRate, target);
-//                    PostSampleRun postSampleRun = new PostSampleRun(new Sampler(samplerStrategy), k, sampleRate, sampleInput, sampleBasePath, foldNumber);
-//                    postSampleRun.run();
-//                }
-//            }
-//        }
-//    }
+    public static void runPostSampleSingleThreaded(Samplers samplerType) throws IOException {
+        String target = InputReader.getTarget(cfg.getString("inputDataDefinitionPath"));
+        String sampleBasePath = OutputWriter.makeSampleDirectory(cfg.getString("experimentBasePath"), samplerType.getSamplerFolderName());
+
+        for (int foldNumber = 0; foldNumber < NUMBER_OF_FOLDS; foldNumber++) {
+            for (int k : kValues) {
+                for (double sampleRate : sampleRates) {
+                    SamplerStrategy samplerStrategy = samplerType.getSamplerStrategy(sampleRate, target);
+                    PostSampleRun postSampleRun = new PostSampleRun(new Sampler(samplerStrategy), sampleBasePath, k, sampleRate, foldNumber, cfg);
+                    postSampleRun.run();
+                }
+            }
+        }
+    }
 
     public static void makeFolds(String pythonEnvPath) throws InterruptedException, IOException {
         String inputDataFile = cfg.getString("inputDataFile");
@@ -203,7 +200,7 @@ public class Main {
         if (cfg.getBoolean("postSample")) {
 //            runPostSample(Samplers.RSample);
             runPostSample(Samplers.SSAMPLE);
-            runPostSample(Samplers.BSample);
+            runPostSample(Samplers.BSAMPLE);
         }
         if (cfg.getBoolean("lDiv")) {
             runEntropyLDiversity();

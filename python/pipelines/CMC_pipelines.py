@@ -53,7 +53,6 @@ def experiment_1_pipeline(verbose: bool, qid_list):
 
 	num = ['WIFEAGE', 'WIFEEDU', 'HUSBEDU', 'CHLD']
 	possibly_starred = list(set(qid_list) - set(num))
-	# print(possibly_starred)
 
 	pipe = Pipeline([
 		('suppressed filter', FunctionSampler(func=filter_suppressed, kw_args={'qid': qid_list}, validate=False)),

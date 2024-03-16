@@ -54,8 +54,8 @@ def read_config(config_path):
   K_LIST, B_LIST, L_LIST = get_run_params()
 
   TARGETS = CFG.get('VARIABLES', 'targets').split(',')
-  if DATASET_NAME == 'cmc':
-    TARGETS = [int(target) for target in TARGETS]
+  # if DATASET_NAME == 'cmc':
+  #   TARGETS = [int(target) for target in TARGETS]
   EXP_NUMBERS = [int(num) for num in CFG.get('VARIABLES', 'experiment_numbers').split(',')]
 
   # OTHER
@@ -99,7 +99,6 @@ def get_xy_split(df_to_split: pd.DataFrame, target):
 def get_run_params():
   with open(EXPERIMENT_STATS_PATH, 'r') as json_file:
     stats = json.load(json_file)
-
   return (stats.get('k_values'), stats.get('b_values'), stats.get('l_values'))
 
 def get_qid() -> list:
@@ -171,12 +170,13 @@ def calc_journalist_risk(population_df: pd.DataFrame, sample_df: pd.DataFrame, a
   return result[result.columns[-1]]
 
 
-def get_generalised(dataset: pd.DataFrame, stats_file: Path, qid_list, hierarchies_base_path) -> pd.DataFrame:
+def get_generalised(dataset: pd.DataFrame, stats_file: Path, hierarchies_base_path) -> pd.DataFrame:
   dataset = dataset.copy()
-  stats_df = pd.read_csv(stats_file, sep=';', decimal=',')
-  gen_levels = stats_df['node'].tolist()[0][1:-1].split(', ')
-  gen_levels = [int(level) for level in gen_levels]
-  
+  with open(stats_file, 'r') as json_file:
+    stats = json.load(json_file)
+  gen_levels = stats.get('node', [])
+  qid_list = stats.get('QID', [])
+
   for level, qi in zip(gen_levels, qid_list):
     hierarchy = pd.read_csv(hierarchies_base_path/f'{qi}.csv', sep=';', decimal=',', header=None, dtype=str) #pay attention to dtype
     hierarchy.set_index(hierarchy.columns[0], drop=False, inplace=True)
@@ -184,11 +184,11 @@ def get_generalised(dataset: pd.DataFrame, stats_file: Path, qid_list, hierarchi
     dataset[qi] = dataset[qi].map(generalization)
   return dataset
 
-def get_stats_file(k_dir_name: str, fold_num=None):
-  if fold_num==None:
-    return K_ANON_BASE_PATH / k_dir_name / 'stats.csv'
-  else:
-    return K_ANON_BASE_PATH / f'fold_{fold_num}' / k_dir_name / 'stats.csv'
+
+def sample_size_zero(stats_file_path):
+  with open(stats_file_path, 'r') as json_file:
+    stats = json.load(json_file)
+  return stats['sample size'] == 0
 
 def save_ml_experiment(experiment_dir: Path, pipe: Pipeline, report):
   if experiment_dir.exists():
@@ -230,10 +230,10 @@ def get_ml_run_report(y_test_generalized, y_predict, y_train):
   return report
 
 def run_model_cv(params):
-  experiment_num, sample_path, stats_file_path, test_df_path, target, pipe, qid_list, hierarchies_base_path = params
+  experiment_num, sample_path, stats_file_path, test_df_path, target, pipe, hierarchies_base_path = params
   train_df = pd.read_csv(sample_path, sep=';')
   test_df = pd.read_csv(test_df_path, sep=';', dtype=str)
-  test_df_generalized = get_generalised(test_df, stats_file_path, qid_list, hierarchies_base_path)
+  test_df_generalized = get_generalised(test_df, stats_file_path, hierarchies_base_path)
   X_train, y_train = get_xy_split(train_df, target)
   X_test_generalized, y_test_generalized = get_xy_split(test_df_generalized, target)
 
@@ -297,9 +297,9 @@ def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
         avg_classification_report_output_path = OUTPUT_BASE_PATH/strat/'ml_experiments'/f'experiment_{experiment_num}'/f'k{k}'/f'B({b})'/'classification_report.json'
         for fold in range(NUM_FOLDS):
           sample_path = OUTPUT_BASE_PATH/strat/f'fold_{fold}'/f'k{k}'/f'B({b})'/f'B({b})_sample.csv'
-          stats_file_path = get_stats_file(f'k{k}', fold)
+          stats_file_path = K_ANON_BASE_PATH / f'fold_{fold}' / f'k{k}' / 'stats.json'
           test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
-          jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), QID_LIST, HIERARCHIES_BASE_PATH))
+          jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), HIERARCHIES_BASE_PATH))
         reports = parallel_run_model_cv(jobs, non_generalized=False, progressbar_desc=f'strat: {strat}, k: {k}, b: {b}')
         calculate_mean_std(reports, avg_classification_report_output_path, TARGETS)
 
@@ -312,9 +312,11 @@ def ml_worker_cv_ldiv(experiment_num, verbose=False):
       avg_classification_report_output_path = OUTPUT_BASE_PATH/'lDiv'/'ml_experiments'/f'experiment_{experiment_num}'/f'k{k}'/f'l{l}'/'classification_report.json'
       for fold in range(NUM_FOLDS):
         sample_path = OUTPUT_BASE_PATH/'lDiv'/f'fold_{fold}'/f'k{k}'/f'l{l}'/'sample.csv'
-        stats_file_path = OUTPUT_BASE_PATH/'lDiv'/f'fold_{fold}'/f'k{k}'/f'l{l}'/'stats.csv'
+        stats_file_path = OUTPUT_BASE_PATH/'lDiv'/f'fold_{fold}'/f'k{k}'/f'l{l}'/'stats.json'
+        if sample_size_zero(stats_file_path):
+          continue
         test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
-        jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), QID_LIST, HIERARCHIES_BASE_PATH))
+        jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), HIERARCHIES_BASE_PATH))
       reports = parallel_run_model_cv(jobs, non_generalized=False, progressbar_desc=f'strat: l-diversity, k: {k}, l: {l} ')
       calculate_mean_std(reports, avg_classification_report_output_path, TARGETS)
 
@@ -337,16 +339,15 @@ if __name__ == '__main__':
   # if PRIVACY_METRICS:
   #     calculate_privacy_metrics_worker(['BSample'], journalist_risk=False, certainty=True)
 
-  # bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'BSample', 
+  # bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'BSAMPLE', 
   #                         K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
   # bsampler_v2.run()  
 
-  # for exp_number in EXP_NUMBERS:
-  #   # zou ik hier ook nog een pool kunnen maken? 
-  #   if ML:
-  #     # ml_worker_cv_nonmasked(exp_number)
-  #     ml_worker_cv(exp_number, ['BSample_v2'])
-  #     # ml_worker_cv_ldiv(exp_number)
+  if ML:
+    ml_worker_cv_ldiv(1)
+    for exp_number in EXP_NUMBERS:
+      # ml_worker_cv_nonmasked(exp_number)
+      # ml_worker_cv(exp_number, ['BSAMPLE', 'SSAMPLE', 'BSAMPLE_v2'])
     
   
   

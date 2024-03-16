@@ -6,15 +6,16 @@ import sampling.strategies.SamplerStrategy;
 import sampling.strategies.StratifiedSampler;
 
 public enum Samplers {
-    SSAMPLE, RSample, BSample;
+    SSAMPLE, RSAMPLE, BSAMPLE;
+
 
     public SamplerStrategy getSamplerStrategy(double sampleRate, String target) {
         switch (this) {
             case SSAMPLE:
                 return new StratifiedSampler(sampleRate);
-            case RSample:
+            case RSAMPLE:
                 return new RandomSampler(sampleRate);
-            case BSample:
+            case BSAMPLE:
                 return new BalancedStratifiedSampler(sampleRate, target);
             default:
                 throw new IllegalArgumentException("unsupported sampler type: " + this);
@@ -25,10 +26,10 @@ public enum Samplers {
         switch (this) {
             case SSAMPLE:
                 return "SSAMPLE";
-            case RSample:
-                return "RSample";
-            case BSample:
-                return "BSample";
+            case RSAMPLE:
+                return "RSAMPLE";
+            case BSAMPLE:
+                return "BSAMPLE";
             default:
                 throw new IllegalArgumentException("unsupported sampler type: " + this);
         }

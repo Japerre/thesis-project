@@ -13,7 +13,7 @@ class BsampleV2:
 		self.qid = qid
 		self.tolerance_percentage = tolerance_percentage
 		self.num_processes = num_processes
-		self.bsample_v2_base_path = Path(self.sample_folder_base_path.parent)/f'BSample_v2'
+		self.bsample_v2_base_path = Path(self.sample_folder_base_path.parent)/f'BSAMPLE_v2'
 		self.bsample_v2_base_path.mkdir(exist_ok=False)
 
 	@staticmethod
@@ -76,5 +76,5 @@ class BsampleV2:
 					jobs.append((sample_path, population_path, fold, k, b, self.qid, self.tolerance_percentage, self.bsample_v2_base_path))
 		
 		with Pool(processes=self.num_processes) as pool:
-			list(tqdm(pool.imap(self._filter_df, jobs), total=len(jobs), desc='Processing'))
+			list(tqdm(pool.imap(self._filter_df, jobs), total=len(jobs), desc='running bsample_v2'))
 

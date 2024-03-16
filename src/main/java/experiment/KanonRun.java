@@ -43,31 +43,7 @@ public class KanonRun implements Callable {
         kAnonFile = new File(kDir, "output_sample.csv");
     }
 
-    private void printSettings(ARXResult result) {
-        File settings = new File(kDir, "settings.csv");
-
-        List<String> QID = new ArrayList<>(result.getDataDefinition().getQuasiIdentifyingAttributes());
-        List<String> IS = new ArrayList<>(result.getDataDefinition().getInsensitiveAttributes());
-        List<String> S = new ArrayList<>(result.getDataDefinition().getSensitiveAttributes());
-
-        String[] headers = {"QID", "IS", "S", "target", "privacy criteria"};
-
-        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-                .setHeader(headers)
-                .setDelimiter(';')
-                .build();
-
-        try (
-                FileWriter fileWriter = new FileWriter(settings);
-                CSVPrinter printer = new CSVPrinter(fileWriter, csvFormat);
-        ) {
-            printer.printRecord(QID, IS, S, target, k + "-anonimity");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void printSettings2(ARXResult result) throws IOException {
+    private void printSettings(ARXResult result) throws IOException {
         File settingsFile = new File(kDir, "settings.json");
 
         List<String> QID = new ArrayList<>(result.getDataDefinition().getQuasiIdentifyingAttributes());
@@ -87,42 +63,7 @@ public class KanonRun implements Callable {
         }
     }
 
-    private void printStats(ARXResult result) {
-        File stats = new File(kDir, "stats.csv");
-
-        String[] headers = {"node", "QID", "suppressed in sample", "sample size", "input size", "equivalence classes", "average EQ size"};
-
-        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-                .setHeader(headers)
-                .setDelimiter(';')
-                .build();
-
-        String qid = Arrays.toString(result.getOutput().getTransformation().getQuasiIdentifyingAttributes());
-        if (!config.containsKey("qid")) {
-            config.setProperty("qid", qid);
-        }
-
-        try (
-                FileWriter fileWriter = new FileWriter(stats);
-                CSVPrinter printer = new CSVPrinter(fileWriter, csvFormat);
-        ) {
-            printer.printRecord(
-                    Arrays.toString(result.getOutput().getTransformation().getTransformation()),
-                    Arrays.toString(result.getOutput().getTransformation().getQuasiIdentifyingAttributes()),
-                    result.getOutput().getView().getStatistics().getEquivalenceClassStatistics().getNumberOfSuppressedRecords(),
-                    result.getOutput().getNumRows() - result.getOutput().getView().getStatistics().getEquivalenceClassStatistics().getNumberOfSuppressedRecords(),
-                    result.getOutput().getNumRows(),
-                    result.getOutput().getStatistics().getEquivalenceClassStatistics().getNumberOfEquivalenceClasses(),
-                    result.getOutput().getStatistics().getEquivalenceClassStatistics().getAverageEquivalenceClassSize()
-            );
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-
-
-    private void printStats2(ARXResult result) throws IOException {
+    private void printStats(ARXResult result) throws IOException {
         File statsFile = new File(kDir, "stats.json");
 
         JsonObject stats = new JsonObject();
@@ -140,10 +81,9 @@ public class KanonRun implements Callable {
         }
     }
 
-
     private void saveResults(ARXResult result) throws IOException {
-        printSettings2(result);
-        printStats2(result);
+        printSettings(result);
+        printStats(result);
         result.getOutput().save(kAnonFile);
     }
 

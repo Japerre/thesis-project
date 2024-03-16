@@ -77,6 +77,13 @@ public class Utils {
         }
     }
 
+    public static <T> JsonArray convertIterableToJsonArray(Iterable<T> iterable) {
+        JsonArray jsonArray = new JsonArray();
+        for (T item : iterable) {
+            jsonArray.add(item.toString());
+        }
+        return jsonArray;
+    }
 
     public static <T> JsonArray convertListToJsonArray(List<T> list){
         JsonArray jsonArray = new JsonArray();
@@ -101,7 +108,6 @@ public class Utils {
         }
         return jsonArray;
     }
-
 
     public static String[] getQID(String inputDataDefinitionPath) throws FileNotFoundException {
         FileReader fileReader = new FileReader(inputDataDefinitionPath);
