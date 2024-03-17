@@ -198,9 +198,9 @@ public class Main {
             runKAnon();
         }
         if (cfg.getBoolean("postSample")) {
-//            runPostSample(Samplers.RSample);
-            runPostSample(Samplers.SSAMPLE);
-            runPostSample(Samplers.BSAMPLE);
+            runPostSample(Samplers.RSAMPLE);
+//            runPostSample(Samplers.SSAMPLE);
+//            runPostSample(Samplers.BSAMPLE);
         }
         if (cfg.getBoolean("lDiv")) {
             runEntropyLDiversity();
