@@ -179,17 +179,16 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
 
-        String configFilePath = args[0];
-        numberOfThreads = Integer.parseInt(args[1]);
-        String pythonEnvPath = args[2]; //"C:\\Users\\tibol\\anaconda3\\envs\\folktables\\python"
-
 //        String configFilePath = "src/config/nursery.properties";
 //        String configFilePath = "src/config/ASCIncome_USA_2018_binned_imbalanced_16645.properties";
 //        String configFilePath = "src/config/ASCIncome_USA_2018_binned_imbalanced_1664500.properties";
 //        String configFilePath = "src/config/ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.properties";
 //        String configFilePath = "src/config/cmc.properties";
-        readProgramConfig(configFilePath);
 
+        String configFilePath = args[0];
+        numberOfThreads = Integer.parseInt(args[1]);
+        String pythonEnvPath = args[2]; //"C:\\Users\\tibol\\anaconda3\\envs\\folktables\\python"
+        readProgramConfig(configFilePath);
 
         if (cfg.getBoolean("crossValidate")) {
             makeFolds(pythonEnvPath);
@@ -199,12 +198,12 @@ public class Main {
         }
         if (cfg.getBoolean("postSample")) {
             runPostSample(Samplers.RSAMPLE);
-//            runPostSample(Samplers.SSAMPLE);
-//            runPostSample(Samplers.BSAMPLE);
+            runPostSample(Samplers.SSAMPLE);
+            runPostSample(Samplers.BSAMPLE);
         }
         if (cfg.getBoolean("lDiv")) {
             runEntropyLDiversity();
         }
-    }
 
+    }
 }

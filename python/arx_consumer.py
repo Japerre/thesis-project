@@ -327,9 +327,9 @@ if __name__ == '__main__':
   
   # config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
-  config_path = 'config/cmc.ini'
+  # config_path = 'config/cmc.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+  config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
   read_config(config_path)
 
   # generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
@@ -337,17 +337,21 @@ if __name__ == '__main__':
   # eq_per_target(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
 
   # if PRIVACY_METRICS:
-  #     calculate_privacy_metrics_worker(['BSample'], journalist_risk=False, certainty=True)
+  #     calculate_privacy_metrics_worker(['RSAMPLE'], journalist_risk=False, certainty=True)
 
   # bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'BSAMPLE', 
   #                         K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
   # bsampler_v2.run()  
 
+
   if ML:
     ml_worker_cv_ldiv(1)
-    for exp_number in EXP_NUMBERS:
-      # ml_worker_cv_nonmasked(exp_number)
-      # ml_worker_cv(exp_number, ['BSAMPLE', 'SSAMPLE', 'BSAMPLE_v2'])
+    ml_worker_cv_nonmasked(1)
+    ml_worker_cv(1, ['BSAMPLE_V2'])
+    
+    # for exp_number in EXP_NUMBERS:
+    #   ml_worker_cv_nonmasked(exp_number)
+    #   ml_worker_cv(exp_number, ['BSAMPLE_v2'])
     
   
   

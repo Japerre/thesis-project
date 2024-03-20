@@ -14,6 +14,7 @@ from fractions import Fraction
 from pprint import pprint
 from multiprocessing import Pool
 from tqdm import tqdm
+from fractions import Fraction
 
 
 BETA = '\u03B2'
@@ -60,18 +61,39 @@ def ASCIncome_target_names():
 		"[100000-inf[": "rich"
 	}
 
+def ssample_rsample_certainty(fold_number, k, b_values):
+	b_values = [item for item in b_values for _ in range(2)]
+	b_values_frac = [str(Fraction(item).limit_denominator()) for item in b_values]
+	labels = ['RSAMPLE', 'SSAMPLE', 'RSAMPLE', 'SSAMPLE']
+	certainty_paths = [OUTPUT_BASE_PATH/f'{sample_strat}/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv' for sample_strat, b in zip(labels, b_values)]
 
-def certainty_plots_balanced_sample_v2(fold_number, k, b):
-	bsample_v1_certainty_path = OUTPUT_BASE_PATH/f'BSample/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
-	bsample_v2_certainty_path = OUTPUT_BASE_PATH/f'BSample_v2/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
+	merged_certainties = pd.DataFrame()
+	for path, x, hue in zip(certainty_paths, b_values_frac, labels):
+				df = pd.read_csv(path, decimal=',', sep=';')
+				df[r'$\beta$'] = x
+				df['Type'] = hue
+				merged_certainties = pd.concat([merged_certainties, df], ignore_index=True)
+	
+	ax = sns.violinplot(x=r'$\beta$', y='0', hue='Type', data=merged_certainties, scale_hue=True, cut=0, scale='area')
+	ax.legend()
+	ax.xaxis.set_label_coords(0, -0.02)
+	plt.ylabel('certainty')
+	plt.tight_layout()
+	plt.show()
+	
 
-	bsample_data = pd.read_csv(bsample_v1_certainty_path, sep=';', decimal=',')
-	bsample_v2_data = pd.read_csv(bsample_v2_certainty_path, sep=';', decimal=',')
+
+def compare_certainty_plots(fold_number, k, b, sample_strats):
+	certainty_path_1 = OUTPUT_BASE_PATH/f'{sample_strats[0]}/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
+	certainty_path_2 = OUTPUT_BASE_PATH/f'{sample_strats[1]}/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
+
+	certainty_data_1 = pd.read_csv(certainty_path_1, sep=';', decimal=',')
+	certainty_data_2 = pd.read_csv(certainty_path_2, sep=';', decimal=',')
 
 	# Combine data into one DataFrame with a 'version' column
-	bsample_data['version'] = 'bsample_v1'
-	bsample_v2_data['version'] = 'bsample_v2'
-	combined_data = pd.concat([bsample_data, bsample_v2_data])
+	certainty_data_1['version'] = sample_strats[0]
+	certainty_data_2['version'] = sample_strats[1]
+	combined_data = pd.concat([certainty_data_1, certainty_data_2])
 
 	# Create the violin plot with seaborn
 	sns.violinplot(x='version', y='0', data=combined_data, cut=0)
@@ -372,27 +394,23 @@ def cmp_balancing_pre_post(
 	plt.close()
 
 
-def test():
-	df = pd.read_csv(r'C:\Users\tibol\Desktop\FIIW Tibo Laperre\fase 5 - thesis\thesis-projectV3\data\results\ACSIncome_USA_2018_binned_imbalanced_1664500\BSample\fold_0\k5\B(0.5)\B(0.5)_sample.csv', sep=';', decimal=',')
-	# print(df)
-
 NUM_PROCESSES = None
 
 if __name__ == '__main__':
 	NUM_PROCESSES = int(sys.argv[1])
-	config_path = 'config/cmc.ini'
+	# config_path = 'config/cmc.ini'
 	# config_path = 'config/nursery.ini'
 	# config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+	config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
-	# test()
 	# violin_plots(0, 10, 'certainty', 'BSAMPLE')
-	# privacy_plots_worker(['BSample'], certainty=True, journalist_risk=True)
-	# certainty_plots_balanced_sample_v2(0, 5, 0.125)
+	# privacy_plots_worker(['SSAMPLE', 'RSAMPLE'], certainty=True, journalist_risk=False)
+	ssample_rsample_certainty(1, 10, [0.25, 0.0625])
+	# compare_certainty_plots(0, 10, 0.25, ['SSAMPLE', 'RSAMPLE'])
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=ASCIncome_target_names(), plot_std=True)
-	grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, target_translation_dict=cmc_target_names(), plot_std=True)
+	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, target_translation_dict=cmc_target_names(), plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE','BSAMPLE'], 1, plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(
