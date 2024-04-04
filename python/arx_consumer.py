@@ -19,7 +19,7 @@ from copy import deepcopy
 
 from configparser import ConfigParser, ExtendedInterpolation
 
-from stats import generalization_stats, sample_stats, eq_per_target, find_biggest_certainty, find_biggest_procentual_certainty
+from stats import generalization_stats, sample_stats, eq_per_target, find_biggest_certainty, find_biggest_procentual_certainty, print_distributions_worker
 from bsampleV2 import BsampleV2
 
 NUM_PROCESSES = None
@@ -40,12 +40,13 @@ def read_config(config_path):
   FOLDS_PATH = Path(CFG['PATHS']['folds_path']).resolve()
 
   # BOOLEANS
-  global MLBALANCE, PRIVACY_METRICS, ML, SAVE_TEST_GENERALIZED, APPEND_ML_EXPERIMENTS
+  global MLBALANCE, PRIVACY_METRICS, ML, SAVE_TEST_GENERALIZED, APPEND_ML_EXPERIMENTS, RUNBSAMPLEV2
   MLBALANCE = CFG.getboolean('BOOLEANS', 'mlbalance')
   PRIVACY_METRICS = CFG.getboolean('BOOLEANS', 'privacy_metrics')
   ML = CFG.getboolean('BOOLEANS', 'ml')
   SAVE_TEST_GENERALIZED = CFG.getboolean('BOOLEANS', 'save_test_generalized')
   APPEND_ML_EXPERIMENTS = CFG.getboolean('BOOLEANS', 'append_ml_experiments')
+  RUNBSAMPLEV2 = CFG.getboolean('BOOLEANS', 'run_bsample_v2')
 
   # VARIABLES
   global NUM_FOLDS, DATASET_NAME, K_LIST, B_LIST, L_LIST, TARGETS, EXP_NUMBERS
@@ -117,7 +118,9 @@ def get_datatypes():
 def calculate_privacy_metrics(params):
   population_path, sample_path, journalist_risk, certainty, privacystats_dir, qid_list = params
   population_df = pd.read_csv(population_path, sep=';', decimal=',').astype(str)
-  sample_df = pd.read_csv(sample_path, delimiter=';')
+  sample_df = pd.read_csv(sample_path, delimiter=';').astype(str)
+  # sample_df = pd.read_csv(sample_path, delimiter=';') moest dit veraderen voor nursery
+
   if certainty:
     certainty_distribution = calc_certainty(population_df, sample_df, qid_list)
     certainty_distribution.to_csv(privacystats_dir / 'certainty.csv', sep=';', decimal=',', index=False)
@@ -148,9 +151,11 @@ def calculate_privacy_metrics_worker(sample_strategies, journalist_risk: bool, c
             shutil.rmtree(privacystats_dir)
           os.makedirs(privacystats_dir)
           jobs.append((dict['population_path'], sample_path, journalist_risk, certainty, privacystats_dir, QID_LIST))
-  
+
   with Pool(processes=NUM_PROCESSES) as pool:
 	  return list(tqdm(pool.imap(calculate_privacy_metrics, jobs),total=len(jobs),desc='calculating privacy metrics'))
+  
+  
 
 def calc_certainty(population_df: pd.DataFrame, sample_df: pd.DataFrame, qid: list) -> pd.Series:
   population_eq = population_df.groupby(qid).size()
@@ -185,10 +190,18 @@ def get_generalised(dataset: pd.DataFrame, stats_file: Path, hierarchies_base_pa
   return dataset
 
 
-def sample_size_zero(stats_file_path):
-  with open(stats_file_path, 'r') as json_file:
-    stats = json.load(json_file)
-  return stats['sample size'] == 0
+def sample_size_zero(stats_file_path=None, sample_path=None, target=None):
+  if stats_file_path:
+    with open(stats_file_path, 'r') as json_file:
+      stats = json.load(json_file)
+    return stats['sample size'] == 0
+  elif sample_path:
+    sample_df = pd.read_csv(sample_path, sep=';', decimal=',')
+    if sample_df.empty:
+      return True
+    elif sample_df[target].nunique() < 2:
+      return True
+    
 
 def save_ml_experiment(experiment_dir: Path, pipe: Pipeline, report):
   if experiment_dir.exists():
@@ -297,6 +310,8 @@ def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
         avg_classification_report_output_path = OUTPUT_BASE_PATH/strat/'ml_experiments'/f'experiment_{experiment_num}'/f'k{k}'/f'B({b})'/'classification_report.json'
         for fold in range(NUM_FOLDS):
           sample_path = OUTPUT_BASE_PATH/strat/f'fold_{fold}'/f'k{k}'/f'B({b})'/f'B({b})_sample.csv'
+          if sample_size_zero(sample_path=sample_path, target=TARGET):
+            continue
           stats_file_path = K_ANON_BASE_PATH / f'fold_{fold}' / f'k{k}' / 'stats.json'
           test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
           jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), HIERARCHIES_BASE_PATH))
@@ -313,7 +328,7 @@ def ml_worker_cv_ldiv(experiment_num, verbose=False):
       for fold in range(NUM_FOLDS):
         sample_path = OUTPUT_BASE_PATH/'lDiv'/f'fold_{fold}'/f'k{k}'/f'l{l}'/'sample.csv'
         stats_file_path = OUTPUT_BASE_PATH/'lDiv'/f'fold_{fold}'/f'k{k}'/f'l{l}'/'stats.json'
-        if sample_size_zero(stats_file_path):
+        if sample_size_zero(stats_file_path=stats_file_path):
           continue
         test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
         jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), HIERARCHIES_BASE_PATH))
@@ -325,30 +340,33 @@ if __name__ == '__main__':
   config_path = sys.argv[1]
   NUM_PROCESSES = int(sys.argv[2])
   
-  # config_path = 'config/nursery.ini'
+  config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
   # config_path = 'config/cmc.ini'
-  # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-  config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
   read_config(config_path)
 
   # generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
   # sample_stats(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
   # eq_per_target(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
 
+  if RUNBSAMPLEV2:
+    bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'BSAMPLE', 
+                              K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
+    bsampler_v2.run()  
+
+  # print_distributions_worker(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, TARGET)
+
   # if PRIVACY_METRICS:
-  #     calculate_privacy_metrics_worker(['RSAMPLE'], journalist_risk=False, certainty=True)
+  #     calculate_privacy_metrics_worker(['BSAMPLE_V2'], journalist_risk=True, certainty=True)
 
-  # bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'BSAMPLE', 
-  #                         K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
-  # bsampler_v2.run()  
-
-
+  
   if ML:
-    ml_worker_cv_ldiv(1)
-    ml_worker_cv_nonmasked(1)
+    # ml_worker_cv_nonmasked(1)
     ml_worker_cv(1, ['BSAMPLE_V2'])
-    
+    ml_worker_cv_ldiv(1)
+
     # for exp_number in EXP_NUMBERS:
     #   ml_worker_cv_nonmasked(exp_number)
     #   ml_worker_cv(exp_number, ['BSAMPLE_v2'])

@@ -2,6 +2,7 @@ from pathlib import Path
 import pandas as pd
 from multiprocessing import Pool
 from tqdm import tqdm
+from stats import drop_suppressed
 
 class BsampleV2:
 	def __init__(self, sample_folder_base_path, k_anon_base_path, num_folds, k_list, b_list, qid, tolerance_percentage, num_processes):
@@ -13,7 +14,7 @@ class BsampleV2:
 		self.qid = qid
 		self.tolerance_percentage = tolerance_percentage
 		self.num_processes = num_processes
-		self.bsample_v2_base_path = Path(self.sample_folder_base_path.parent)/f'BSAMPLE_v2'
+		self.bsample_v2_base_path = Path(self.sample_folder_base_path.parent)/f'BSAMPLE_V2'
 		self.bsample_v2_base_path.mkdir(exist_ok=False)
 
 	@staticmethod
@@ -40,7 +41,9 @@ class BsampleV2:
 		sample_path, population_path, fold, k, b, qid, tolerance_percentage, bsample_v2_base_path = params
 		max_cert = b * (1 + tolerance_percentage)
 		population_df = pd.read_csv(population_path, sep=';', decimal=',')
+		population_df = drop_suppressed(population_df, self.qid)
 		sample_df = pd.read_csv(sample_path, sep=';', decimal=',')
+		sample_df = drop_suppressed(sample_df, self.qid)
 		certainty_df = self._certainty(population_df, sample_df, qid, False)
 		sample_df_filtered = sample_df.groupby(qid).apply(
 					lambda group: self._take_sample(group, certainty_df[group.name], max_cert)).reset_index(drop=True)
@@ -54,25 +57,13 @@ class BsampleV2:
 		certainty_df_filtered.to_csv(certainty_filtered_path, sep=';', decimal=',', index=False)
 		sample_df_filtered.to_csv(sample_filtered_path, sep=';', decimal=',', index=False)
 
-
 	def run(self):
 		jobs = []
 		for fold in range(self.num_folds):
 			for k in self.k_list:
 				population_path = Path(self.kanon_base_path)/f'fold_{fold}/k{k}/output_sample.csv'
-				# try:
-				# 	population_df = pd.read_csv(population_path, sep=';', decimal=',')
-				# except Exception as e:
-				# 	print(e)
-				# 	print(f"fold: {fold}, k: {k}")
-
 				for b in self.b_list:
 					sample_path = Path(self.sample_folder_base_path)/f'fold_{fold}/k{k}/B({b})/B({b})_sample.csv'
-					# try:
-					# 	sample_df = pd.read_csv(sample_path, sep=';', decimal=',')
-					# except Exception as e:
-					# 	print(e)
-					# 	print(f"fold: {fold}, k: {k}, b: {b}")
 					jobs.append((sample_path, population_path, fold, k, b, self.qid, self.tolerance_percentage, self.bsample_v2_base_path))
 		
 		with Pool(processes=self.num_processes) as pool:

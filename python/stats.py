@@ -1,7 +1,11 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from helper.table_plotter import plot_table
 import numpy as np
+from multiprocessing import Pool
+from tqdm import tqdm
+
 
 def drop_suppressed(df, qid_list):
 	try:
@@ -159,3 +163,31 @@ def find_biggest_procentual_certainty(bsample_base_path, num_folds, k_list, b_li
 	
 	print(max_certainty_procentual_diff_path)
 	print(max_cert_procentual_diff)
+
+
+def print_distribution(params):
+	sample_path, output_path, target = params
+	df = pd.read_csv(sample_path, sep=';', decimal=',')
+	sns.histplot(data=df, x=target, kde=False, color='purple')
+	plt.xlabel(target)
+	plt.ylabel('Count')
+	plt.title(f'Distribution of {target}')
+	sns.despine()
+	plt.savefig(output_path)
+	plt.close()
+
+def print_distributions_worker(sample_base_path, num_folds, k_list, b_list, target, num_processes=4):
+	jobs = []
+	for fold in range(num_folds):
+		for k in k_list:
+			for b in b_list:
+				sample_path = sample_base_path/f'fold_{fold}/k{k}/B({b})/B({b})_sample.csv'
+				output_path = sample_base_path/f'fold_{fold}/k{k}/B({b})/distribution.png'
+				jobs.append((sample_path, output_path, target))
+	
+	# for job in jobs:
+	# 	print_distribution(job)
+
+	with Pool(processes=num_processes) as pool:
+		result = list(tqdm(pool.imap(print_distribution, jobs),total=len(jobs)))
+

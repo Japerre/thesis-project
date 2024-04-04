@@ -94,7 +94,7 @@ public class Main {
 
                 for (int k : kValues) {
                     for (double l : lValues) {
-                        LdiversityRun ldiversityRun = new LdiversityRun(k, l, cfg, foldDir, trainPath);
+                        LdiversityRun ldiversityRun = new LdiversityRun(foldNumber, k, l, cfg, foldDir, trainPath);
                         futures.add(executorService.submit(ldiversityRun));
                     }
                 }

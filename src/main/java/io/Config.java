@@ -34,6 +34,8 @@ public class Config {
     public static ARXConfiguration getConfig(int k, double l, String target, Metric qualityMetric){
         ARXConfiguration config = ARXConfiguration.create();
         config.addPrivacyModel(new KAnonymity(k));
+//        config.addPrivacyModel(new EntropyLDiversity("PINCP", l));
+//        config.addPrivacyModel(new EntropyLDiversity("RELP", l));
         config.addPrivacyModel(new EntropyLDiversity(target, l));
         config.setSuppressionLimit(1d);
         config.setQualityModel(qualityMetric);

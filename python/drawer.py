@@ -82,7 +82,6 @@ def ssample_rsample_certainty(fold_number, k, b_values):
 	plt.show()
 	
 
-
 def compare_certainty_plots(fold_number, k, b, sample_strats):
 	certainty_path_1 = OUTPUT_BASE_PATH/f'{sample_strats[0]}/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
 	certainty_path_2 = OUTPUT_BASE_PATH/f'{sample_strats[1]}/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
@@ -104,7 +103,7 @@ def compare_certainty_plots(fold_number, k, b, sample_strats):
 	# Save the plot
 	plt.show()
 
-
+	
 def privacy_plot(params):
 	privacy_metric_path, privacy_metric_output_plot_path = params
 	data = pd.read_csv(privacy_metric_path, sep=';', decimal=',')
@@ -132,7 +131,7 @@ def privacy_plots_worker(sample_strats: list, certainty=False, journalist_risk=F
 	with Pool(processes=NUM_PROCESSES) as pool:
 	  return list(tqdm(pool.imap(privacy_plot, jobs),total=len(jobs),desc='plotting privacy plots'))
 
-def violin_plots(fold, k, metric, sample_strat):
+def compare_violin_plots(fold, k, metric, sample_strat, title=None):
 	all_data = pd.DataFrame()
 
 	# Collect data
@@ -143,15 +142,24 @@ def violin_plots(fold, k, metric, sample_strat):
 			df['B'] = b  # Add a column to indicate the B value for this dataset
 			all_data = pd.concat([all_data, df], ignore_index=True)
 
-	# Plotting
+	# Plotting		
 	plt.figure(figsize=(10, 6))  # Adjust the figure size as needed
-	sns.violinplot(x='B', y='0', data=all_data, cut=0)  # Replace 'your_column_name' with the name of the column you want to plot
+	sns.violinplot(x='B', y='0', data=all_data, cut=0, order=reversed(sorted(all_data['B'].unique())))  # Replace 'your_column_name' with the name of the column you want to plot
 
-	plt.title(f'Violin Plot of {metric} by B Value for {sample_strat}, k={k}, fold={fold}')
-	plt.xlabel('B Value')
-	plt.ylabel(metric)  # Adjust labels as needed
-	plt.xticks(rotation=45)  # In case B values are not nicely numbered or if there are many B values
+	labels = [item.get_text() for item in plt.gca().get_xticklabels()]
+	frac_labels = [str(Fraction(float(label)).limit_denominator()) for label in labels]
 
+	if metric == 'journalistRisk':
+		plt.ylabel('Journalist Risk')
+	if metric == 'certainty':
+		plt.ylabel('Certainty')
+	if title is not None:
+		plt.title(title)
+	else:
+		plt.title(f'Violin Plot of {metric} by B Value for {sample_strat}, k={k}, fold={fold}')
+	
+	plt.xticks(range(len(frac_labels)), frac_labels)
+	plt.xlabel(BETA, loc='left', labelpad=-9)
 	plt.tight_layout()
 	plt.show()	
 
@@ -329,6 +337,8 @@ def classification_report_json_to_df(ml_experiments_dir: Path, ldiv=False):
 					flat_json['k'] = k_val
 					flat_json['l'] = l_val
 				df = pd.concat([df, flat_json], ignore_index=True)
+	
+	df.fillna(0, inplace=True)
 	avg_strats = [key for key in report.keys() if key not in ['accuracy', 'train_record_counts']]
 	return (df, avg_strats)
 
@@ -399,19 +409,19 @@ NUM_PROCESSES = None
 if __name__ == '__main__':
 	NUM_PROCESSES = int(sys.argv[1])
 	# config_path = 'config/cmc.ini'
-	# config_path = 'config/nursery.ini'
+	config_path = 'config/nursery.ini'
 	# config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-	config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
 	# violin_plots(0, 10, 'certainty', 'BSAMPLE')
-	# privacy_plots_worker(['SSAMPLE', 'RSAMPLE'], certainty=True, journalist_risk=False)
-	ssample_rsample_certainty(1, 10, [0.25, 0.0625])
+	# privacy_plots_worker(['BSAMPLE', 'BSAMPLE_V2'], certainty=True, journalist_risk=True)
+	# ssample_rsample_certainty(1, 10, [0.25, 0.0625])
 	# compare_certainty_plots(0, 10, 0.25, ['SSAMPLE', 'RSAMPLE'])
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
-	# grouped_bar_chart_big_image(['SSAMPLE', 'BSAMPLE'], 1, target_translation_dict=ASCIncome_target_names(), plot_std=True)
-	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, target_translation_dict=cmc_target_names(), plot_std=True)
-	# grouped_bar_chart_big_image(['SSAMPLE','BSAMPLE'], 1, plot_std=True)
+	# compare_violin_plots(0, 5, 'journalistRisk', 'SSAMPLE', title=f'Journalist Risk voor k=5 bij dalende {BETA}')
+	grouped_bar_chart_big_image(['SSAMPLE'], 1, plot_std=True)
+	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, target_translation_dict=ASCIncome_target_names(), plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(
 	# 	sample_strats=['SSAMPLE', 'BSAMPLE', 'RSAMPLE'], 

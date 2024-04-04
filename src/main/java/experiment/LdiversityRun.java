@@ -27,6 +27,7 @@ import java.util.concurrent.Callable;
 import static io.Utils.*;
 
 public class LdiversityRun implements Callable<Long> {
+    private int foldNumber;
     private int k;
     private double l;
     private Configuration cfg;
@@ -36,7 +37,8 @@ public class LdiversityRun implements Callable<Long> {
     private String trainFilePath;
     private File outputFile;
 
-    public LdiversityRun(int k, double l, Configuration cfg, String foldDir, String trainFilePath){
+    public LdiversityRun(int foldNumber, int k, double l, Configuration cfg, String foldDir, String trainFilePath){
+        this.foldNumber = foldNumber;
         this.k = k;
         this.l = l;
         this.cfg = cfg;
@@ -69,31 +71,6 @@ public class LdiversityRun implements Callable<Long> {
         }
     }
 
-//    private void printSettings(ARXResult result) {
-//        File settings = new File(outputFile.getParentFile(), "settings.csv");
-//
-//        List<String> QID = new ArrayList<>(result.getDataDefinition().getQuasiIdentifyingAttributes());
-//        List<String> IS = new ArrayList<>(result.getDataDefinition().getInsensitiveAttributes());
-//        List<String> S = new ArrayList<>(result.getDataDefinition().getSensitiveAttributes());
-//
-//
-//        String[] headers = {"QID", "IS", "S", "target", "privacy criteria"};
-//
-//        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-//                .setHeader(headers)
-//                .setDelimiter(';')
-//                .build();
-//
-//        try (
-//                FileWriter fileWriter = new FileWriter(settings);
-//                CSVPrinter printer = new CSVPrinter(fileWriter, csvFormat);
-//        ) {
-//            printer.printRecord(QID, IS, S, target, result.getConfiguration().getPrivacyModels());
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//    }
-
     private void printStats2(ARXResult result) throws IOException {
         File statsFile = new File(outputFile.getParentFile(), "stats.json");
 
@@ -111,39 +88,6 @@ public class LdiversityRun implements Callable<Long> {
             gson.toJson(stats, writer);
         }
     }
-
-//    private void printStats(ARXResult result) {
-//        File stats = new File(outputFile.getParentFile(), "stats.csv");
-//
-//        String[] headers = {"node", "QID", "suppressed in sample", "sample size", "input size", "equivalence classes", "average EQ size"};
-//
-//        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-//                .setHeader(headers)
-//                .setDelimiter(';')
-//                .build();
-//
-//        String qid = Arrays.toString(result.getOutput().getTransformation().getQuasiIdentifyingAttributes());
-//        if(!cfg.containsKey("qid")){
-//            cfg.setProperty("qid", qid);
-//        }
-//
-//        try (
-//                FileWriter fileWriter = new FileWriter(stats);
-//                CSVPrinter printer = new CSVPrinter(fileWriter, csvFormat);
-//        ) {
-//            printer.printRecord(
-//                    Arrays.toString(result.getOutput().getTransformation().getTransformation()),
-//                    Arrays.toString(result.getOutput().getTransformation().getQuasiIdentifyingAttributes()),
-//                    result.getOutput().getView().getStatistics().getEquivalenceClassStatistics().getNumberOfSuppressedRecords(),
-//                    result.getOutput().getView().getNumRows(),
-//                    result.getOutput().getNumRows(),
-//                    result.getOutput().getStatistics().getEquivalenceClassStatistics().getNumberOfEquivalenceClasses(),
-//                    result.getOutput().getStatistics().getEquivalenceClassStatistics().getAverageEquivalenceClassSize()
-//            );
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//    }
 
     private void saveResults(ARXResult result) throws IOException {
         printSettings2(result);
@@ -170,7 +114,7 @@ public class LdiversityRun implements Callable<Long> {
         this.run();
         long end = System.currentTimeMillis();
         long duration = end - start;
-        System.out.println("k"+k+" l"+l+": sucessfully ran in "+duration/1000d+" seconds");
+        System.out.println("fold " + foldNumber + " k" + k + " l" + l + ": sucessfully ran in " + duration / 1000d + " seconds");
         return (end - start);
     }
 
