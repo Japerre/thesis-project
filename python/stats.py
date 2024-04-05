@@ -5,6 +5,7 @@ from helper.table_plotter import plot_table
 import numpy as np
 from multiprocessing import Pool
 from tqdm import tqdm
+import json
 
 
 def drop_suppressed(df, qid_list):
@@ -18,17 +19,18 @@ def drop_suppressed(df, qid_list):
 def format_mean_std(mean, std):
 	return f"{mean:.1f} ± {std:.1f}"  # Format mean and std with one decimal precision
 
-
 def generalization_stats(k_list, num_folds, k_anon_base_path, output_base_path, qid_list):
-	# header = ['k','n']+qid_list+['suppressed_cnt', 'std_suppressed', 'sample_size', 'std_sample_size', 'EQ_cnt', 'std_EQ', 'avg_EQ_size', 'std_avg_EQ_size']
 	header = ['k','n']+qid_list+['suppressed_cnt', 'sample_size','EQ_cnt', 'avg_EQ_size']
 	records = []
 	num_cols = ['suppressed in sample', 'sample size', 'equivalence classes', 'average EQ size']
 	for k in k_list:
 		stats_df_combined = pd.DataFrame()
 		for fold_num in range(num_folds):
-			stats_file = k_anon_base_path/f"fold_{fold_num}"/f"k{k}"/"stats.csv"
-			stats_df = pd.read_csv(stats_file, sep=';', decimal='.')
+			stats_file = k_anon_base_path/f"fold_{fold_num}"/f"k{k}"/"stats.json"
+			with open(stats_file, 'r') as file:
+				stats_data = json.load(file)
+				stats_df = pd.json_normalize(stats_data)
+				stats_df['node'] = stats_df['node'].apply(lambda x: str(x))
 			stats_df_combined = pd.concat([stats_df_combined, stats_df], ignore_index=True)
 		
 		groups = stats_df_combined.groupby('node')
@@ -44,13 +46,14 @@ def generalization_stats(k_list, num_folds, k_anon_base_path, output_base_path, 
 	
 	df = pd.DataFrame(records, columns=header)
 	# df.fillna(0, inplace=True)
-	generelization_stats_path = output_base_path/'stats'/'generelization_stats.csv'
-	generelization_stats_path.parent.mkdir(parents=True, exist_ok=True)
-	df.to_csv(generelization_stats_path, sep=';', index=False)
+	generalization_stats_path = output_base_path/'stats'/'generalization_stats.csv'
+	generalization_stats_path.parent.mkdir(parents=True, exist_ok=True)
+	df.to_csv(generalization_stats_path, sep=';', index=False)
 
 
 def sample_stats(strats_to_run, k_list, b_list, num_folds, output_base_path, qid_list, target_col, targets):
 	for strat in strats_to_run:
+		missing_targets_data = []
 		result_data = []
 		for k in k_list:
 			for b in b_list:
@@ -66,7 +69,8 @@ def sample_stats(strats_to_run, k_list, b_list, num_folds, output_base_path, qid
 					for missing_target in missing_targets:
 						min_counts[missing_target] = 0
 						max_counts[missing_target] = max(max_counts[missing_target], 0)
-						print(f"strat: {strat}, fold: {fold}, k: {k}, b: {b} ==> does not have {missing_target} in train set")	
+						print(f"strat: {strat}, fold: {fold}, k: {k}, b: {b} ==> does not have {missing_target} in train set")
+						missing_targets_data.append({"strat": strat, "fold": fold, "k": k, "b": b, "target": missing_target})
 
 					for target, count in target_counts.items():
 						min_counts[target] = min(min_counts[target], count)
@@ -74,7 +78,6 @@ def sample_stats(strats_to_run, k_list, b_list, num_folds, output_base_path, qid
 						
 					target_counts_list.append(target_counts)
 
-				
 				target_counts_df = pd.concat(target_counts_list, axis=1)
 				mean_counts = target_counts_df.mean(axis=1)
 				std_counts = target_counts_df.std(axis=1)
@@ -87,8 +90,13 @@ def sample_stats(strats_to_run, k_list, b_list, num_folds, output_base_path, qid
 		sample_stats_path = output_base_path/'stats'/f'{strat}'/'target_counts_stats.csv'
 		sample_stats_path.parent.mkdir(parents=True, exist_ok=True)
 		result_df.to_csv(sample_stats_path, sep=';',index=False)
-	
-					
+		
+		if missing_targets_data:
+			missing_targets_df = pd.DataFrame(missing_targets_data)
+			missing_targets_path = output_base_path/'stats'/f'{strat}'/'missing_targets.csv'
+			missing_targets_df.to_csv(missing_targets_path, sep=';', index=False)
+
+
 def eq_per_target(strats_to_run, k_list, b_list, num_folds, output_base_path, qid_list, target, targets):
 	for strat in strats_to_run:
 		result_data = []
@@ -185,9 +193,50 @@ def print_distributions_worker(sample_base_path, num_folds, k_list, b_list, targ
 				output_path = sample_base_path/f'fold_{fold}/k{k}/B({b})/distribution.png'
 				jobs.append((sample_path, output_path, target))
 	
-	# for job in jobs:
-	# 	print_distribution(job)
-
 	with Pool(processes=num_processes) as pool:
 		result = list(tqdm(pool.imap(print_distribution, jobs),total=len(jobs)))
 
+
+def print_fully_suppressed_samples_ldiv(ldiv_base_path, num_folds, k_list, l_list):
+	fully_suppressed_samples = []
+	for k in k_list:
+		for l in l_list:
+			for fold in range(num_folds):
+				sample_stats_path = ldiv_base_path/f'fold_{fold}/k{k}/l{l}/stats.json'
+				with open(sample_stats_path, 'r') as json_file:
+					stats = json.load(json_file)
+				if stats['sample size'] == 0:
+					fully_suppressed_samples.append(f'fold: {fold} k: {k} l: {l}')
+	
+	for entry in fully_suppressed_samples:
+		print(entry)
+
+def check_for_fully_suppressed(params):
+		sample_path, qid = params
+		try:
+				sample_df = pd.read_csv(sample_path, sep=';', decimal=',')
+				not_fully_suppressed = ~(sample_df[qid] == '*').all(axis=1)
+				if not not_fully_suppressed.any():
+						# all records are suppressed
+						print(sample_path)
+						return sample_path
+		except Exception as e:
+				print(f"Error processing file {sample_path}: {e}")
+		return None
+
+def print_fully_suppressed_samples(sample_base_path, num_folds, k_list, b_list, qid, num_processes=8):
+		jobs = []
+		for fold in range(num_folds):
+				for k in k_list:
+						for b in b_list:
+								sample_path = sample_base_path / f'fold_{fold}' / f'k{k}' / f'B({b})' / f'B({b})_sample.csv'
+								jobs.append((sample_path, qid))
+		
+		# Use multiprocessing to process files and track progress with tqdm
+		with Pool(processes=num_processes) as pool:
+				results = list(tqdm(pool.imap(check_for_fully_suppressed, jobs), total=len(jobs), desc='Checking for fully suppressed samples'))
+
+		# Filter out None results and print paths of files with fully suppressed samples
+		fully_suppressed_samples = [result for result in results if result is not None]
+		for path in fully_suppressed_samples:
+				print(f"Fully suppressed sample found in: {path}")

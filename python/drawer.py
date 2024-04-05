@@ -415,13 +415,13 @@ if __name__ == '__main__':
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
 	# violin_plots(0, 10, 'certainty', 'BSAMPLE')
-	# privacy_plots_worker(['BSAMPLE', 'BSAMPLE_V2'], certainty=True, journalist_risk=True)
+	privacy_plots_worker(['SSAMPLE_V2'], certainty=True, journalist_risk=False)
 	# ssample_rsample_certainty(1, 10, [0.25, 0.0625])
 	# compare_certainty_plots(0, 10, 0.25, ['SSAMPLE', 'RSAMPLE'])
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
 	# compare_violin_plots(0, 5, 'journalistRisk', 'SSAMPLE', title=f'Journalist Risk voor k=5 bij dalende {BETA}')
-	grouped_bar_chart_big_image(['SSAMPLE'], 1, plot_std=True)
-	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, target_translation_dict=ASCIncome_target_names(), plot_std=True)
+	# grouped_bar_chart_big_image(['SSAMPLE_V2'], 1, plot_std=True)
+	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(
 	# 	sample_strats=['SSAMPLE', 'BSAMPLE', 'RSAMPLE'], 

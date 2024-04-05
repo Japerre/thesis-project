@@ -14,8 +14,8 @@ class BsampleV2:
 		self.qid = qid
 		self.tolerance_percentage = tolerance_percentage
 		self.num_processes = num_processes
-		self.bsample_v2_base_path = Path(self.sample_folder_base_path.parent)/f'BSAMPLE_V2'
-		self.bsample_v2_base_path.mkdir(exist_ok=False)
+		self.sample_v2_base_path = Path(self.sample_folder_base_path.parent)/f'{self.sample_folder_base_path.name}_V2'
+		self.sample_v2_base_path.mkdir(exist_ok=False)
 
 	@staticmethod
 	def _certainty(population_df: pd.DataFrame, sample_df: pd.DataFrame, qid: list, output:bool) -> pd.Series:
@@ -38,7 +38,7 @@ class BsampleV2:
 			return group.sample(amount, ignore_index=True).reset_index(drop=True)
 
 	def _filter_df(self, params):
-		sample_path, population_path, fold, k, b, qid, tolerance_percentage, bsample_v2_base_path = params
+		sample_path, population_path, fold, k, b, qid, tolerance_percentage, sample_v2_base_path = params
 		max_cert = b * (1 + tolerance_percentage)
 		population_df = pd.read_csv(population_path, sep=';', decimal=',')
 		population_df = drop_suppressed(population_df, self.qid)
@@ -50,8 +50,8 @@ class BsampleV2:
 		sample_df_filtered = sample_df_filtered.sample(frac=1).reset_index(drop=True)
 		certainty_df_filtered = self._certainty(population_df, sample_df_filtered, qid, True)
 
-		certainty_filtered_path = Path(bsample_v2_base_path)/f'fold_{fold}/k{k}/B({b})/privacystats/certainty.csv'
-		sample_filtered_path = Path(bsample_v2_base_path)/f'fold_{fold}/k{k}/B({b})/B({b})_sample.csv'
+		certainty_filtered_path = Path(sample_v2_base_path)/f'fold_{fold}/k{k}/B({b})/privacystats/certainty.csv'
+		sample_filtered_path = Path(sample_v2_base_path)/f'fold_{fold}/k{k}/B({b})/B({b})_sample.csv'
 		certainty_filtered_path.parent.mkdir(parents=True, exist_ok=True)
 		sample_filtered_path.parent.mkdir(parents=True, exist_ok=True)
 		certainty_df_filtered.to_csv(certainty_filtered_path, sep=';', decimal=',', index=False)
@@ -64,8 +64,8 @@ class BsampleV2:
 				population_path = Path(self.kanon_base_path)/f'fold_{fold}/k{k}/output_sample.csv'
 				for b in self.b_list:
 					sample_path = Path(self.sample_folder_base_path)/f'fold_{fold}/k{k}/B({b})/B({b})_sample.csv'
-					jobs.append((sample_path, population_path, fold, k, b, self.qid, self.tolerance_percentage, self.bsample_v2_base_path))
+					jobs.append((sample_path, population_path, fold, k, b, self.qid, self.tolerance_percentage, self.sample_v2_base_path))
 		
 		with Pool(processes=self.num_processes) as pool:
-			list(tqdm(pool.imap(self._filter_df, jobs), total=len(jobs), desc='running bsample_v2'))
+			list(tqdm(pool.imap(self._filter_df, jobs), total=len(jobs), desc='sample_v2'))
 

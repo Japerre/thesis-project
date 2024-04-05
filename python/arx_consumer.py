@@ -19,7 +19,7 @@ from copy import deepcopy
 
 from configparser import ConfigParser, ExtendedInterpolation
 
-from stats import generalization_stats, sample_stats, eq_per_target, find_biggest_certainty, find_biggest_procentual_certainty, print_distributions_worker
+from stats import generalization_stats, sample_stats, eq_per_target, find_biggest_certainty, find_biggest_procentual_certainty, print_distributions_worker, print_fully_suppressed_samples
 from bsampleV2 import BsampleV2
 
 NUM_PROCESSES = None
@@ -343,29 +343,32 @@ if __name__ == '__main__':
   config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
   # config_path = 'config/cmc.ini'
-  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
   # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
   read_config(config_path)
 
-  # generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
-  # sample_stats(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
-  # eq_per_target(['SSample', 'BSample'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  # print_fully_suppressed_samples(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, QID_LIST)
 
-  if RUNBSAMPLEV2:
-    bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'BSAMPLE', 
-                              K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
-    bsampler_v2.run()  
+ 
+
+  # if RUNBSAMPLEV2:
+  #   bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'SSAMPLE', 
+  #                             K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
+  #   bsampler_v2.run()  
 
   # print_distributions_worker(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, TARGET)
 
   # if PRIVACY_METRICS:
-  #     calculate_privacy_metrics_worker(['BSAMPLE_V2'], journalist_risk=True, certainty=True)
+  #     calculate_privacy_metrics_worker(['SSAMPLE_V2'], journalist_risk=False, certainty=True)
 
-  
-  if ML:
+  # generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
+  sample_stats(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  eq_per_target(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+
+  # if ML:
     # ml_worker_cv_nonmasked(1)
-    ml_worker_cv(1, ['BSAMPLE_V2'])
-    ml_worker_cv_ldiv(1)
+    # ml_worker_cv(1, ['SSAMPLE_V2'])
+    # ml_worker_cv_ldiv(1)
 
     # for exp_number in EXP_NUMBERS:
     #   ml_worker_cv_nonmasked(exp_number)
