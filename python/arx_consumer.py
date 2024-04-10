@@ -20,7 +20,8 @@ from copy import deepcopy
 from configparser import ConfigParser, ExtendedInterpolation
 
 from stats import generalization_stats, sample_stats, eq_per_target, find_biggest_certainty, find_biggest_procentual_certainty, print_distributions_worker, print_fully_suppressed_samples
-from bsampleV2 import BsampleV2
+from stats import eq_stats, draw_eq_distributions, draw_combined_eq_distributions
+from sampleV2 import SampleV2
 
 NUM_PROCESSES = None
 
@@ -40,13 +41,13 @@ def read_config(config_path):
   FOLDS_PATH = Path(CFG['PATHS']['folds_path']).resolve()
 
   # BOOLEANS
-  global MLBALANCE, PRIVACY_METRICS, ML, SAVE_TEST_GENERALIZED, APPEND_ML_EXPERIMENTS, RUNBSAMPLEV2
+  global MLBALANCE, PRIVACY_METRICS, ML, SAVE_TEST_GENERALIZED, APPEND_ML_EXPERIMENTS, RUNSAMPLEV2
   MLBALANCE = CFG.getboolean('BOOLEANS', 'mlbalance')
   PRIVACY_METRICS = CFG.getboolean('BOOLEANS', 'privacy_metrics')
   ML = CFG.getboolean('BOOLEANS', 'ml')
   SAVE_TEST_GENERALIZED = CFG.getboolean('BOOLEANS', 'save_test_generalized')
   APPEND_ML_EXPERIMENTS = CFG.getboolean('BOOLEANS', 'append_ml_experiments')
-  RUNBSAMPLEV2 = CFG.getboolean('BOOLEANS', 'run_bsample_v2')
+  RUNSAMPLEV2 = CFG.getboolean('BOOLEANS', 'run_sample_v2')
 
   # VARIABLES
   global NUM_FOLDS, DATASET_NAME, K_LIST, B_LIST, L_LIST, TARGETS, EXP_NUMBERS
@@ -349,25 +350,30 @@ if __name__ == '__main__':
 
   # print_fully_suppressed_samples(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, QID_LIST)
 
- 
-
-  # if RUNBSAMPLEV2:
-  #   bsampler_v2 = BsampleV2(OUTPUT_BASE_PATH/'SSAMPLE', 
+  # if RUNSAMPLEV2:
+  #   sample_v2 = SampleV2(OUTPUT_BASE_PATH/'SSAMPLE', 
   #                             K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
-  #   bsampler_v2.run()  
+  #   sample_v2.run() 
+    # sample_v2 = SampleV2(OUTPUT_BASE_PATH/'BSAMPLE', 
+    #                           K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
+    # sample_v2.run()
 
-  # print_distributions_worker(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, TARGET)
 
   # if PRIVACY_METRICS:
-  #     calculate_privacy_metrics_worker(['SSAMPLE_V2'], journalist_risk=False, certainty=True)
+  #     calculate_privacy_metrics_worker(['SSAMPLE_V2'], journalist_risk=True, certainty=True)
 
   # generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
-  sample_stats(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
-  eq_per_target(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  # sample_stats(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  # eq_per_target(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
+  # eq_stats(['SSAMPLE'], K_LIST, B_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, OUTPUT_BASE_PATH/'stats', QID_LIST)
+  # draw_eq_distributions(K_LIST, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
+  # draw_combined_eq_distributions(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, K_ANON_BASE_PATH, QID_LIST)
+  # print_distributions_worker(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, TARGET)
 
-  # if ML:
-    # ml_worker_cv_nonmasked(1)
-    # ml_worker_cv(1, ['SSAMPLE_V2'])
+
+  if ML:
+    ml_worker_cv_nonmasked(3)
+    ml_worker_cv(3, ['SSAMPLE_V2'])
     # ml_worker_cv_ldiv(1)
 
     # for exp_number in EXP_NUMBERS:

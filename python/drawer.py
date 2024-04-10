@@ -348,8 +348,8 @@ def cmp_balancing_pre_post(
 		target_translation_dict=None, 
 		):
 	
-	BSample_dir = OUTPUT_BASE_PATH/'BSample'/'ml_experiments'/'experiment_1'
-	SSample_dir = OUTPUT_BASE_PATH/'SSample'/'ml_experiments'/'experiment_3'
+	BSample_dir = OUTPUT_BASE_PATH/'BSAMPLE_V2'/'ml_experiments'/'experiment_1'
+	SSample_dir = OUTPUT_BASE_PATH/'SSAMPLE_V2'/'ml_experiments'/'experiment_3'
 
 	output_dir = OUTPUT_BASE_PATH / 'ml_plots' / 'experiment_1,3' / 'diff_pre_post_balancing'
 	if not os.path.exists(output_dir):
@@ -400,6 +400,7 @@ def cmp_balancing_pre_post(
 
 	# Save the figure
 	plt.tight_layout()
+	# plt.show()
 	plt.savefig(output_dir / 'diff_pre_post_balancing.png', bbox_inches='tight')
 	plt.close()
 
@@ -415,13 +416,13 @@ if __name__ == '__main__':
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
 	# violin_plots(0, 10, 'certainty', 'BSAMPLE')
-	privacy_plots_worker(['SSAMPLE_V2'], certainty=True, journalist_risk=False)
+	# privacy_plots_worker(['SSAMPLE_V2'], certainty=True, journalist_risk=False)
 	# ssample_rsample_certainty(1, 10, [0.25, 0.0625])
 	# compare_certainty_plots(0, 10, 0.25, ['SSAMPLE', 'RSAMPLE'])
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
 	# compare_violin_plots(0, 5, 'journalistRisk', 'SSAMPLE', title=f'Journalist Risk voor k=5 bij dalende {BETA}')
-	# grouped_bar_chart_big_image(['SSAMPLE_V2'], 1, plot_std=True)
-	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
+	# grouped_bar_chart_big_image(['SSAMPLE_V2'], target_translation_dict=ASCIncome_target_names(), experiment_num=1, plot_std=True)
+	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True, target_translation_dict=ASCIncome_target_names())
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(
 	# 	sample_strats=['SSAMPLE', 'BSAMPLE', 'RSAMPLE'], 
@@ -430,7 +431,7 @@ if __name__ == '__main__':
 	# 	# rus=True,
 	# 	# title="ASCIncome RUS balancing after SSample"
 	# 	)
-	# cmp_balancing_pre_post("ASCIncome BSample vs SSample with RUS in ML pipeline", ASCIncome_target_names())
+	cmp_balancing_pre_post(title="nursery BSAMPLE_V2 vs SSample_V2 with RUS in ML pipeline")
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample')
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=cmc_target_names(), ros=True, title='CMC ROS balancing after SSample', plot_std=True)
 	

@@ -4,7 +4,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 from stats import drop_suppressed
 
-class BsampleV2:
+class SampleV2:
 	def __init__(self, sample_folder_base_path, k_anon_base_path, num_folds, k_list, b_list, qid, tolerance_percentage, num_processes):
 		self.sample_folder_base_path = sample_folder_base_path
 		self.kanon_base_path = k_anon_base_path
