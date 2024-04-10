@@ -341,7 +341,7 @@ if __name__ == '__main__':
   config_path = sys.argv[1]
   NUM_PROCESSES = int(sys.argv[2])
   
-  config_path = 'config/nursery.ini'
+  # config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
   # config_path = 'config/cmc.ini'
   # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
@@ -350,14 +350,12 @@ if __name__ == '__main__':
 
   # print_fully_suppressed_samples(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, QID_LIST)
 
-  # if RUNSAMPLEV2:
-  #   sample_v2 = SampleV2(OUTPUT_BASE_PATH/'SSAMPLE', 
-  #                             K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
-  #   sample_v2.run() 
-    # sample_v2 = SampleV2(OUTPUT_BASE_PATH/'BSAMPLE', 
-    #                           K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
-    # sample_v2.run()
-
+  if RUNSAMPLEV2:
+    sample_strats = ['SSAMPLE', 'BSAMPLE']
+    for sample_strat in sample_strats:
+      sample_v2 = SampleV2(OUTPUT_BASE_PATH/f'{sample_strat}', 
+                                K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
+      sample_v2.run()
 
   # if PRIVACY_METRICS:
   #     calculate_privacy_metrics_worker(['SSAMPLE_V2'], journalist_risk=True, certainty=True)
@@ -373,12 +371,12 @@ if __name__ == '__main__':
 
   if ML:
     ml_worker_cv_nonmasked(3)
-    ml_worker_cv(3, ['SSAMPLE_V2'])
+    ml_worker_cv(1, ['SSAMPLE_V2', 'BSAMPLE_V2'])
+    ml_worker_cv(3, ['SSAMPLE_V2', 'BSAMPLE_V2']) 
+
     # ml_worker_cv_ldiv(1)
 
-    # for exp_number in EXP_NUMBERS:
-    #   ml_worker_cv_nonmasked(exp_number)
-    #   ml_worker_cv(exp_number, ['BSAMPLE_v2'])
+    
     
   
   

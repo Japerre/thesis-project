@@ -197,7 +197,7 @@ public class Main {
             runKAnon();
         }
         if (cfg.getBoolean("postSample")) {
-            runPostSample(Samplers.RSAMPLE);
+//            runPostSample(Samplers.RSAMPLE);
             runPostSample(Samplers.SSAMPLE);
             runPostSample(Samplers.BSAMPLE);
         }
