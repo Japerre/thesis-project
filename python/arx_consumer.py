@@ -220,21 +220,40 @@ def save_ml_experiment(experiment_dir: Path, pipe: Pipeline, report):
     pprint(pipe.get_params(), stream=f)
 
 
-def calculate_mean_std(reports, output_path, targets):
+def calculate_mean_std(reports, output_path, targets, num_folds):
   targets = deepcopy(targets)
   os.makedirs(output_path.parent, exist_ok=True)
   avg_report = {}
   targets += ['macro avg', 'weighted avg']
-  for target in targets:
-      avg_report[target] = {
-          'mean_precision': np.average([report[target]['precision'] for report in reports]),
-          'std_precision': np.std([report[target]['precision'] for report in reports]),
-          'mean_recall': np.average([report[target]['recall'] for report in reports]),
-          'std_recall': np.std([report[target]['recall'] for report in reports]),
-          'mean_f1-score': np.average([report[target]['f1-score'] for report in reports]),
-          'std_f1-score': np.std([report[target]['f1-score'] for report in reports])
-      }
 
+  for target in targets:
+    precisions = [report[target]['precision'] for report in reports]
+    recalls = [report[target]['recall'] for report in reports]
+    f1_scores = [report[target]['f1-score'] for report in reports]
+
+    # Pad the data with zeros if fewer than desired samples
+    non_empty_folds_len = len(precisions)
+    precisions += [0] * (num_folds - non_empty_folds_len)
+    recalls += [0] * (num_folds - non_empty_folds_len)
+    f1_scores += [0] * (num_folds - non_empty_folds_len)
+    
+    # Calculate mean and standard deviation using the padded data
+    avg_report[target] = {
+        'mean_precision': float(np.mean(precisions)),
+        'std_precision': float(np.std(precisions, ddof=1)),
+        'min_precision': float(np.min(precisions)),
+        'max_precision': float(np.max(precisions)),
+        'mean_recall': float(np.mean(recalls)),
+        'std_recall': float(np.std(recalls, ddof=1)),
+        'min_recall': float(np.min(recalls)),
+        'max_recall': float(np.max(recalls)),
+        'mean_f1-score': float(np.mean(f1_scores)),
+        'std_f1-score': float(np.std(f1_scores, ddof=1)),
+        'min_f1-score': float(np.min(f1_scores)),
+        'max_f1-score': float(np.max(f1_scores))
+      }
+    
+  # pprint(avg_report)
   with open(output_path, 'w') as json_file:
     json.dump(avg_report, json_file, indent=2)	
 
@@ -291,7 +310,7 @@ def ml_worker_cv_nonmasked(experiment_num, verbose=False):
         fold_path = FOLDS_PATH/f'fold_{fold}'
         jobs.append((experiment_num, fold_path, TARGET, deepcopy(pipes[i])))
       reports = parallel_run_model_cv(jobs, non_generalized=True, progressbar_desc=f'non_generalized: True')
-      calculate_mean_std(reports, output_paths[i], TARGETS)
+      calculate_mean_std(reports, output_paths[i], TARGETS, NUM_FOLDS)
   else:
     pipe, non_masked_pipe = pipes_tuple
     output_path = FOLDS_PATH/'ml_experiments'/f'experiment_{experiment_num}'/'classification_report.json'
@@ -300,7 +319,7 @@ def ml_worker_cv_nonmasked(experiment_num, verbose=False):
       fold_path = FOLDS_PATH/f'fold_{fold}'
       jobs.append((experiment_num, fold_path, TARGET, deepcopy(non_masked_pipe)))
     reports = parallel_run_model_cv(jobs, non_generalized=True, progressbar_desc=f'non_generalized: True')
-    calculate_mean_std(reports, output_path, TARGETS)
+    calculate_mean_std(reports, output_path, TARGETS, NUM_FOLDS)
 
 def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
   pipe, *_ = get_pipelines(experiment_num)
@@ -317,7 +336,7 @@ def ml_worker_cv(experiment_num, strats_to_run, verbose=False):
           test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
           jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), HIERARCHIES_BASE_PATH))
         reports = parallel_run_model_cv(jobs, non_generalized=False, progressbar_desc=f'strat: {strat}, k: {k}, b: {b}')
-        calculate_mean_std(reports, avg_classification_report_output_path, TARGETS)
+        calculate_mean_std(reports, avg_classification_report_output_path, TARGETS, NUM_FOLDS)
 
 
 def ml_worker_cv_ldiv(experiment_num, verbose=False):
@@ -334,7 +353,24 @@ def ml_worker_cv_ldiv(experiment_num, verbose=False):
         test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
         jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), HIERARCHIES_BASE_PATH))
       reports = parallel_run_model_cv(jobs, non_generalized=False, progressbar_desc=f'strat: l-diversity, k: {k}, l: {l} ')
-      calculate_mean_std(reports, avg_classification_report_output_path, TARGETS)
+      calculate_mean_std(reports, avg_classification_report_output_path, TARGETS, NUM_FOLDS)
+
+def calculate_mean_std_worker(sample_strats, experiment_nums):
+  for strat in sample_strats:
+    for k in K_LIST:
+      for b in B_LIST:
+        for exp_num in experiment_nums:
+          reports = []
+          avg_classification_report_output_path = OUTPUT_BASE_PATH/strat/'ml_experiments'/f'experiment_{exp_num}'/f'k{k}'/f'B({b})'/'classification_report.json'
+          for fold in range(NUM_FOLDS):
+            report_path = OUTPUT_BASE_PATH/strat/f"fold_{fold}"/f"k{k}"/f"B({b})"/"ml_experiments"/f"experiment_{exp_num}"/"classification_report.json"
+            if not os.path.isfile(report_path):
+              continue # if there is no report for k,b because that dataset was empty
+            with open(report_path, 'r') as json_report:
+              report = json.load(json_report)
+            reports.append(report)
+          calculate_mean_std(reports, avg_classification_report_output_path, TARGETS, NUM_FOLDS)
+
 
 
 if __name__ == '__main__':
@@ -344,18 +380,20 @@ if __name__ == '__main__':
   # config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
   # config_path = 'config/cmc.ini'
-  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
+  config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
   # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
   read_config(config_path)
 
   # print_fully_suppressed_samples(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, QID_LIST)
 
-  if RUNSAMPLEV2:
-    sample_strats = ['SSAMPLE', 'BSAMPLE']
-    for sample_strat in sample_strats:
-      sample_v2 = SampleV2(OUTPUT_BASE_PATH/f'{sample_strat}', 
-                                K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.2, NUM_PROCESSES)
-      sample_v2.run()
+  calculate_mean_std_worker(['SSAMPLE_V2', 'BSAMPLE_V2'], [1,3])
+
+  # if RUNSAMPLEV2:
+  #   sample_strats = ['SSAMPLE', 'BSAMPLE']
+  #   for sample_strat in sample_strats:
+  #     sample_v2 = SampleV2(OUTPUT_BASE_PATH/f'{sample_strat}', 
+  #                               K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.0, NUM_PROCESSES)
+  #     sample_v2.run()
 
   # if PRIVACY_METRICS:
   #     calculate_privacy_metrics_worker(['SSAMPLE_V2'], journalist_risk=True, certainty=True)
@@ -369,10 +407,11 @@ if __name__ == '__main__':
   # print_distributions_worker(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, TARGET)
 
 
-  if ML:
-    ml_worker_cv_nonmasked(3)
-    ml_worker_cv(1, ['SSAMPLE_V2', 'BSAMPLE_V2'])
-    ml_worker_cv(3, ['SSAMPLE_V2', 'BSAMPLE_V2']) 
+  # if ML:
+  #   ml_worker_cv_nonmasked(1)
+  #   ml_worker_cv_nonmasked(3)
+  #   ml_worker_cv(1, ['SSAMPLE_V2', 'BSAMPLE_V2'])
+  #   ml_worker_cv(3, ['SSAMPLE_V2', 'BSAMPLE_V2']) 
 
     # ml_worker_cv_ldiv(1)
 

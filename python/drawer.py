@@ -224,6 +224,7 @@ def grouped_bar_chart_big_image(
 		target_translation_dict=None, 
 		plot_non_masked=True,
 		plot_std=False, 
+		plot_range=False,
 		ros=False,
 		rus=False,
 		ldiv=False
@@ -252,11 +253,15 @@ def grouped_bar_chart_big_image(
 			for j, metric in enumerate(metrics):
 				mean_dict = {}
 				std_dict = {}
+				min_dict = {}
+				max_dict = {}
 				if ldiv:
 					for k in K_LIST:
 						k_rows = df.query(f'k == {k}').sort_values(by='l', ascending=True)
 						mean_dict[k] = k_rows[f'{avg_strat}.mean_{metric}'].tolist()
 						std_dict[k] = k_rows[f'{avg_strat}.std_{metric}'].tolist()
+						min_dict[k] = k_rows[f'{avg_strat}.min_{metric}'].tolist()
+						max_dict[k] = k_rows[f'{avg_strat}.max_{metric}'].tolist()
 					x = np.arange(len(L_LIST))
 				
 				if not ldiv:
@@ -264,6 +269,8 @@ def grouped_bar_chart_big_image(
 						k_rows = df.query(f'k == {k}').sort_values(by='b', ascending=False)
 						mean_dict[k] = k_rows[f'{avg_strat}.mean_{metric}'].tolist()
 						std_dict[k] = k_rows[f'{avg_strat}.std_{metric}'].tolist()
+						min_dict[k] = k_rows[f'{avg_strat}.min_{metric}'].tolist()
+						max_dict[k] = k_rows[f'{avg_strat}.max_{metric}'].tolist()
 					x = np.arange(len(B_LIST))
 				
 				width = 0.13
@@ -271,9 +278,16 @@ def grouped_bar_chart_big_image(
 
 				for key, value in mean_dict.items():
 					offset = width * multiplier
-					std_values = std_dict[key]
 					if plot_std:
+						std_values = std_dict[key]
 						rects = axes[i, j].bar(x + offset, value, width, label=f'k={key}', yerr=std_values)
+					elif plot_range:
+						min_values = min_dict[key]
+						max_values = max_dict[key]
+						lower_errors = [mean - min_val for mean, min_val in zip(value, min_values)]
+						upper_errors = [max_val - mean for mean, max_val in zip(value, max_values)]
+						error_bars = [lower_errors, upper_errors]
+						rects = axes[i, j].bar(x + offset, value, width, label=f'k={key}', yerr=error_bars)
 					else:
 						rects = axes[i, j].bar(x + offset, value, width, label=f'k={key}')
 					multiplier += 1
@@ -410,9 +424,9 @@ NUM_PROCESSES = None
 if __name__ == '__main__':
 	NUM_PROCESSES = int(sys.argv[1])
 	# config_path = 'config/cmc.ini'
-	config_path = 'config/nursery.ini'
+	# config_path = 'config/nursery.ini'
 	# config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
-	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
+	config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
 	# violin_plots(0, 10, 'certainty', 'BSAMPLE')
@@ -421,7 +435,7 @@ if __name__ == '__main__':
 	# compare_certainty_plots(0, 10, 0.25, ['SSAMPLE', 'RSAMPLE'])
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
 	# compare_violin_plots(0, 5, 'journalistRisk', 'SSAMPLE', title=f'Journalist Risk voor k=5 bij dalende {BETA}')
-	# grouped_bar_chart_big_image(['SSAMPLE_V2'], target_translation_dict=ASCIncome_target_names(), experiment_num=1, plot_std=True)
+	grouped_bar_chart_big_image(['SSAMPLE_V2', 'BSAMPLE_V2'], experiment_num=3, plot_range=True, target_translation_dict=ASCIncome_target_names())
 	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True, target_translation_dict=ASCIncome_target_names())
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(
@@ -431,7 +445,7 @@ if __name__ == '__main__':
 	# 	# rus=True,
 	# 	# title="ASCIncome RUS balancing after SSample"
 	# 	)
-	cmp_balancing_pre_post(title="nursery BSAMPLE_V2 vs SSample_V2 with RUS in ML pipeline")
+	# cmp_balancing_pre_post(title="nursery BSAMPLE_V2 vs SSample_V2 with RUS in ML pipeline")
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample')
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=cmc_target_names(), ros=True, title='CMC ROS balancing after SSample', plot_std=True)
 	
