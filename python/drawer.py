@@ -32,7 +32,8 @@ def read_config(config_path):
 	FOLDS_PATH = Path(cfg['PATHS']['folds_path']).resolve()
 
 	#OTHER
-	global DATASET_NAME, K_LIST, B_LIST, L_LIST
+	global DATASET_NAME, K_LIST, B_LIST, L_LIST, NUM_FOLDS
+	NUM_FOLDS = cfg.getint('VARIABLES', 'num_folds')
 	DATASET_NAME = cfg['PATHS']['dataset_name']
 	K_LIST, B_LIST, L_LIST = get_run_params()
 
@@ -163,6 +164,7 @@ def compare_violin_plots(fold, k, metric, sample_strat, title=None):
 	plt.tight_layout()
 	plt.show()	
 
+
 def grouped_bar_chart(sample_strats: list, experiment_num, plot_non_masked: bool):
 	for sample_strat in sample_strats:
 		# sample_strat = 'SSample'
@@ -216,6 +218,98 @@ def grouped_bar_chart(sample_strats: list, experiment_num, plot_non_masked: bool
 				plt.savefig(output_dir/f'{avg_strat}_{metric}.png', bbox_inches='tight')
 				plt.close()
 
+def empty_samples_heatmap():
+	ldiv_base_path = OUTPUT_BASE_PATH/'ldiv'
+	empty_samples_matrix = np.zeros((len(K_LIST), len(L_LIST))).astype(int)
+	for k_index, k in enumerate(K_LIST):
+		for l_index, l in enumerate(L_LIST):
+			for fold in range(NUM_FOLDS):
+				stats_path = ldiv_base_path/f'fold_{fold}/k{k}/l{l}/stats.json'
+				with open(stats_path, 'r') as stats_file:
+					stats = json.load(stats_file)
+				if stats.get('sample size', 1) == 0:
+					empty_samples_matrix[k_index, l_index] +=1
+					
+
+	# Plotting the heatmap
+	plt.figure(figsize=(10, 8))
+	sns.heatmap(empty_samples_matrix, annot=True, fmt="d", cmap="viridis",
+							xticklabels=L_LIST, yticklabels=K_LIST)
+	plt.xlabel('L values')
+	plt.ylabel('K values')
+	plt.title('Heatmap of Empty Sample Sizes Across Folds')
+	plt.show()
+	
+def figure_1():
+	ACSIncome_big_ml_experiments_dir = Path(r'../data/output2/ACSIncome_USA_2018_binned_imbalanced_1664500/SSAMPLE_V2/ml_experiments/experiment_1')
+	ACSIncome_big_non_masked_report_path = Path(r'../data/output2/ACSIncome_USA_2018_binned_imbalanced_1664500/inputDataset/folds/ml_experiments/experiment_1/classification_report.json')
+	ACSIncome_small_ml_experiments_dir = Path(r'../data/output2/ACSIncome_USA_2018_binned_imbalanced_1664/SSAMPLE_V2/ml_experiments/experiment_1')
+	ACSIncome_small_non_masked_report_path = Path(r'../data/output2/ACSIncome_USA_2018_binned_imbalanced_1664/inputDataset/folds/ml_experiments/experiment_1/classification_report.json')
+
+	k_list = [5, 10, 20, 50]
+	b_list = [0.2, 0.1, 0.05, 0.02]
+	fraction_b_values = [Fraction(value).limit_denominator() for value in b_list]
+	
+	big_df, _ = classification_report_json_to_df(ACSIncome_big_ml_experiments_dir)
+	small_df, _ = classification_report_json_to_df(ACSIncome_small_ml_experiments_dir)
+	
+	data_frames = [big_df, small_df]
+	non_masked_reports_paths = [ACSIncome_big_non_masked_report_path, ACSIncome_small_non_masked_report_path]
+	fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+	
+	y_min = float('inf')
+	y_max = float('-inf')
+	
+	# First pass to determine the global y-axis limits
+	for df in data_frames:
+		for k in k_list:
+			k_rows = df.query(f'k == {k} and b in @b_list').sort_values(by='b', ascending=False)
+			min_values = k_rows['[100000-inf[.min_f1-score'].tolist()
+			max_values = k_rows['[100000-inf[.max_f1-score'].tolist()
+			y_min = min(y_min, min(min_values))
+			y_max = max(y_max, max(max_values))
+	
+	# Second pass to plot
+	handles, labels = [], []
+	for i, df in enumerate(data_frames):
+		width = 0.18
+		x = np.arange(len(b_list))
+		
+		non_masked_report_path = non_masked_reports_paths[i]
+		with open(non_masked_report_path, 'r') as f:
+			non_masked_report = json.load(f)
+		y_val = non_masked_report['[100000-inf[']['mean_f1-score']
+		non_masked_line = axes[i].axhline(y=y_val, label='non masked', color='red', linestyle='--')
+
+		for k in k_list:
+			k_rows = df.query(f'k == {k} and b in @b_list').sort_values(by='b', ascending=False)
+			value = k_rows['[100000-inf[.mean_f1-score'].tolist()
+			min_values = k_rows['[100000-inf[.min_f1-score'].tolist()
+			max_values = k_rows['[100000-inf[.max_f1-score'].tolist()
+			lower_errors = np.array(value) - np.array(min_values)
+			upper_errors = np.array(max_values) - np.array(value)
+			error_bars = [lower_errors, upper_errors]
+			
+			offset = width * (k_list.index(k))
+			rects = axes[i].bar(x + offset, value, width, label=f'k={k}', yerr=error_bars, capsize=5)
+
+			if i == 0:
+				handles.append(rects[0])
+				labels.append(f'k={k}')
+		
+		if i == 0:  # Add the non-masked line handle to the legend only once
+			handles.append(non_masked_line)
+			labels.append('non masked')
+    
+		axes[i].set_title(f"ACSIncome {'1664500' if i == 0 else '1644'}")
+		axes[i].set_xticks(x + width * (len(k_list) - 1) / 2)
+		axes[i].set_xlabel(BETA, loc='left', labelpad=-9)
+		axes[i].set_xticklabels([b for b in fraction_b_values])
+		axes[i].set_ylim([y_min, y_max])  # Set the same y-axis limits for both subplots
+
+	fig.legend(handles, labels, loc='upper right', ncol=1)
+	plt.tight_layout()
+	plt.show()
 			
 def grouped_bar_chart_big_image(
 		sample_strats: list, 
@@ -426,17 +520,20 @@ if __name__ == '__main__':
 	# config_path = 'config/cmc.ini'
 	# config_path = 'config/nursery.ini'
 	# config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
-	config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
+	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664.ini'
+	config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
+	# figure_1()
 	# violin_plots(0, 10, 'certainty', 'BSAMPLE')
 	# privacy_plots_worker(['SSAMPLE_V2'], certainty=True, journalist_risk=False)
 	# ssample_rsample_certainty(1, 10, [0.25, 0.0625])
-	# compare_certainty_plots(0, 10, 0.25, ['SSAMPLE', 'RSAMPLE'])
-	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True)
+	# empty_samples_heatmap()
+	# compare_certainty_plots(0, 10, 0.5, ['BSAMPLE', 'BSAMPLE_V2'])
+	grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_range=True, target_translation_dict=ASCIncome_target_names())
 	# compare_violin_plots(0, 5, 'journalistRisk', 'SSAMPLE', title=f'Journalist Risk voor k=5 bij dalende {BETA}')
-	grouped_bar_chart_big_image(['SSAMPLE_V2', 'BSAMPLE_V2'], experiment_num=3, plot_range=True, target_translation_dict=ASCIncome_target_names())
-	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_std=True, target_translation_dict=ASCIncome_target_names())
+	# grouped_bar_chart_big_image(['SSAMPLE_V2', 'BSAMPLE_V2'], experiment_num=1, plot_range=True, target_translation_dict=cmc_target_names())
+	# grouped_bar_chart_big_image(['lDiv'], 1, ldiv=True, plot_range=True, target_translation_dict=cmc_target_names())
 	# grouped_bar_chart_big_image(['SSAMPLE'], 3, target_translation_dict=ASCIncome_target_names(), rus=True, title='ASCIncome RUS balancing after SSample', plot_std=True)
 	# grouped_bar_chart_big_image(
 	# 	sample_strats=['SSAMPLE', 'BSAMPLE', 'RSAMPLE'], 

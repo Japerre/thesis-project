@@ -371,8 +371,6 @@ def calculate_mean_std_worker(sample_strats, experiment_nums):
             reports.append(report)
           calculate_mean_std(reports, avg_classification_report_output_path, TARGETS, NUM_FOLDS)
 
-
-
 if __name__ == '__main__':
   config_path = sys.argv[1]
   NUM_PROCESSES = int(sys.argv[2])
@@ -380,13 +378,14 @@ if __name__ == '__main__':
   # config_path = 'config/nursery.ini'
   # config_path = 'config\ACSIncome_USA_2018_binned_imbalanced_16645_acc_metric.ini'
   # config_path = 'config/cmc.ini'
-  config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
-  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
+  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_16645.ini'
+  # config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664.ini'
+  config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
   read_config(config_path)
 
   # print_fully_suppressed_samples(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, QID_LIST)
 
-  calculate_mean_std_worker(['SSAMPLE_V2', 'BSAMPLE_V2'], [1,3])
+  # calculate_mean_std_worker(['SSAMPLE_V2', 'BSAMPLE_V2'], [1,3])
 
   # if RUNSAMPLEV2:
   #   sample_strats = ['SSAMPLE', 'BSAMPLE']
@@ -396,7 +395,7 @@ if __name__ == '__main__':
   #     sample_v2.run()
 
   # if PRIVACY_METRICS:
-  #     calculate_privacy_metrics_worker(['SSAMPLE_V2'], journalist_risk=True, certainty=True)
+  #     calculate_privacy_metrics_worker(['BSAMPLE'], journalist_risk=False, certainty=True)
 
   # generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
   # sample_stats(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
@@ -407,13 +406,12 @@ if __name__ == '__main__':
   # print_distributions_worker(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, TARGET)
 
 
-  # if ML:
-  #   ml_worker_cv_nonmasked(1)
-  #   ml_worker_cv_nonmasked(3)
-  #   ml_worker_cv(1, ['SSAMPLE_V2', 'BSAMPLE_V2'])
-  #   ml_worker_cv(3, ['SSAMPLE_V2', 'BSAMPLE_V2']) 
-
-    # ml_worker_cv_ldiv(1)
+  if ML:
+    # ml_worker_cv_nonmasked(1)
+    # ml_worker_cv_nonmasked(3)
+    # ml_worker_cv(1, ['SSAMPLE_V2', 'BSAMPLE_V2'])
+    # ml_worker_cv(3, ['SSAMPLE_V2', 'BSAMPLE_V2']) 
+    ml_worker_cv_ldiv(1)
 
     
     
