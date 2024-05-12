@@ -56,8 +56,8 @@ def read_config(config_path):
   K_LIST, B_LIST, L_LIST = get_run_params()
 
   TARGETS = CFG.get('VARIABLES', 'targets').split(',')
-  # if DATASET_NAME == 'cmc':
-  #   TARGETS = [int(target) for target in TARGETS]
+  if DATASET_NAME == 'cmc':
+    TARGETS = [str(target) for target in TARGETS]
   EXP_NUMBERS = [int(num) for num in CFG.get('VARIABLES', 'experiment_numbers').split(',')]
 
   # OTHER
@@ -355,6 +355,21 @@ def ml_worker_cv_ldiv(experiment_num, verbose=False):
       reports = parallel_run_model_cv(jobs, non_generalized=False, progressbar_desc=f'strat: l-diversity, k: {k}, l: {l} ')
       calculate_mean_std(reports, avg_classification_report_output_path, TARGETS, NUM_FOLDS)
 
+def ml_worker_cv_kanon(experiment_num, verbose=False):
+  pipe, *_ = get_pipelines(experiment_num)
+  for k in K_LIST:
+    jobs = []
+    avg_classification_report_output_path = OUTPUT_BASE_PATH/'kAnon'/'ml_experiments'/f'experiment_{experiment_num}'/f'k{k}'/'classification_report.json'
+    for fold in range(NUM_FOLDS):
+      sample_path = OUTPUT_BASE_PATH/'kAnon'/f'fold_{fold}'/f'k{k}'/'output_sample.csv'
+      stats_file_path = OUTPUT_BASE_PATH/'kAnon'/f'fold_{fold}'/f'k{k}'/'stats.json'
+      if sample_size_zero(stats_file_path=stats_file_path):
+        continue
+      test_df_path = FOLDS_PATH/f'fold_{fold}'/'test.csv'
+      jobs.append((experiment_num, sample_path, stats_file_path, test_df_path, TARGET, deepcopy(pipe), HIERARCHIES_BASE_PATH))
+    reports = parallel_run_model_cv(jobs, non_generalized=False, progressbar_desc=f'strat: k-anonymity, k: {k}')
+    calculate_mean_std(reports, avg_classification_report_output_path, TARGETS, NUM_FOLDS)
+
 def calculate_mean_std_worker(sample_strats, experiment_nums):
   for strat in sample_strats:
     for k in K_LIST:
@@ -401,17 +416,19 @@ if __name__ == '__main__':
   # sample_stats(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
   # eq_per_target(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
   # eq_stats(['SSAMPLE'], K_LIST, B_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, OUTPUT_BASE_PATH/'stats', QID_LIST)
-  # draw_eq_distributions(K_LIST, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
+  # draw_eq_distributions(K_LIST, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST, log_scale=True)
   # draw_combined_eq_distributions(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, K_ANON_BASE_PATH, QID_LIST)
   # print_distributions_worker(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, TARGET)
 
 
   if ML:
-    # ml_worker_cv_nonmasked(1)
-    # ml_worker_cv_nonmasked(3)
-    # ml_worker_cv(1, ['SSAMPLE_V2', 'BSAMPLE_V2'])
-    # ml_worker_cv(3, ['SSAMPLE_V2', 'BSAMPLE_V2']) 
-    ml_worker_cv_ldiv(1)
+  #   # ml_worker_cv_nonmasked(1)
+  #   # ml_worker_cv_nonmasked(3)
+  #   # ml_worker_cv(1, ['SSAMPLE_V2', 'BSAMPLE_V2'])
+  #   # ml_worker_cv(3, ['SSAMPLE_V2', 'BSAMPLE_V2']) 
+    ml_worker_cv_ldiv(3)
+    # ml_worker_cv_kanon(3)
+    
 
     
     

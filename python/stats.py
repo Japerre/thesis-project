@@ -51,7 +51,7 @@ def generalization_stats(k_list, num_folds, k_anon_base_path, output_base_path, 
 	df.to_csv(generalization_stats_path, sep=';', index=False)
 
 
-def draw_eq_distributions(k_list, k_anon_base_path, output_base_path, qid_list):
+def draw_eq_distributions(k_list, k_anon_base_path, output_base_path, qid_list, log_scale=False):
 	for k in k_list:
 		kanon_sample_path = k_anon_base_path/'fold_0'/f'k{k}'/'output_sample.csv'
 		output_path = output_base_path/'stats'/'kAnon'/'EQdist'/f'{k}_eq_distribution.png'
@@ -65,10 +65,13 @@ def draw_eq_distributions(k_list, k_anon_base_path, output_base_path, qid_list):
 		bins = np.arange(min_eq_size - 0.5, max_eq_size + 1.5)
 		plt.hist(eq_sizes, bins=bins, alpha=0.75, color='blue', edgecolor='black')
 		
-		plt.title(f'EQ Size Distribution for k={k}')
-		plt.xlabel('EQ Size')
-		plt.ylabel('Frequency')
+		plt.title(f'EQ-grootte Distributie voor k={k}')
+		plt.xlabel('EQ-grootte')
+		plt.ylabel('Frequentie')
 		plt.xlim(min_eq_size - 1, max_eq_size + 1)	
+		if log_scale:
+			plt.xscale('log')
+		# plt.xlim(min_eq_size - 1, 37)
 		plt.savefig(output_path)
 
 
