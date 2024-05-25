@@ -409,8 +409,8 @@ if __name__ == '__main__':
   #                               K_ANON_BASE_PATH, NUM_FOLDS, K_LIST, B_LIST, QID_LIST, 0.0, NUM_PROCESSES)
   #     sample_v2.run()
 
-  # if PRIVACY_METRICS:
-  #     calculate_privacy_metrics_worker(['BSAMPLE'], journalist_risk=False, certainty=True)
+  if PRIVACY_METRICS:
+      calculate_privacy_metrics_worker(['BSAMPLE'], journalist_risk=False, certainty=True)
 
   # generalization_stats(K_LIST, NUM_FOLDS, K_ANON_BASE_PATH, OUTPUT_BASE_PATH, QID_LIST)
   # sample_stats(['SSAMPLE_V2'], K_LIST, B_LIST, NUM_FOLDS, OUTPUT_BASE_PATH, QID_LIST, TARGET, TARGETS)
@@ -421,12 +421,12 @@ if __name__ == '__main__':
   # print_distributions_worker(OUTPUT_BASE_PATH/'BSAMPLE_V2', NUM_FOLDS, K_LIST, B_LIST, TARGET)
 
 
-  if ML:
+  # if ML:
   #   # ml_worker_cv_nonmasked(1)
   #   # ml_worker_cv_nonmasked(3)
   #   # ml_worker_cv(1, ['SSAMPLE_V2', 'BSAMPLE_V2'])
   #   # ml_worker_cv(3, ['SSAMPLE_V2', 'BSAMPLE_V2']) 
-    ml_worker_cv_ldiv(3)
+    # ml_worker_cv_ldiv(3)
     # ml_worker_cv_kanon(3)
     
 

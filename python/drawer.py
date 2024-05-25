@@ -7,6 +7,7 @@ import pandas as pd
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 import ast
 from sklearn.ensemble import GradientBoostingClassifier
 from joblib import load
@@ -85,6 +86,7 @@ def ssample_rsample_certainty(fold_number, k, b_values):
 	
 
 def compare_certainty_plots(fold_number, k, b, sample_strats, sample_strats_names):
+	rcParams.update({'font.size': 14})
 	certainty_path_1 = OUTPUT_BASE_PATH/f'{sample_strats[0]}/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
 	certainty_path_2 = OUTPUT_BASE_PATH/f'{sample_strats[1]}/fold_{fold_number}/k{k}/b({b})/privacystats/certainty.csv'
 
@@ -100,8 +102,8 @@ def compare_certainty_plots(fold_number, k, b, sample_strats, sample_strats_name
 	sns.violinplot(x='version', y='0', data=combined_data, cut=0)
 	plt.xlabel('')
 	plt.ylabel('certainty')
-	plt.title(f'{DATASET_NAME} - stratified balanced sampling voor k={k}, {BETA}={b}')
-	plt.tight_layout()
+	# plt.title(f'{DATASET_NAME} - stratified balanced sampling voor k={k}, {BETA}={b}')
+	# plt.tight_layout()
 	# Save the plot
 	plt.show()
 
@@ -134,6 +136,7 @@ def privacy_plots_worker(sample_strats: list, certainty=False, journalist_risk=F
 	  return list(tqdm(pool.imap(privacy_plot, jobs),total=len(jobs),desc='plotting privacy plots'))
 
 def compare_violin_plots(fold, k, metric, sample_strat, title=None):
+	rcParams.update({'font.size': 14})
 	all_data = pd.DataFrame()
 
 	# Collect data
@@ -157,12 +160,11 @@ def compare_violin_plots(fold, k, metric, sample_strat, title=None):
 		plt.ylabel('Certainty')
 	if title is not None:
 		plt.title(title)
-	else:
-		plt.title(f'Violin Plot of {metric} by B Value for {sample_strat}, k={k}, fold={fold}')
+	# else:
+	# 	plt.title(f'Violin Plot of {metric} by B Value for {sample_strat}, k={k}, fold={fold}')
 	
 	plt.xticks(range(len(frac_labels)), frac_labels)
-	plt.xlabel(BETA, loc='left', labelpad=-9)
-	plt.tight_layout()
+	plt.xlabel(BETA, loc='left', labelpad=-12)
 	plt.show()	
 
 
@@ -274,7 +276,11 @@ def suppressed_heatmap(sample_strat):
 
 
 def figure_8():
-	dataset = 'cmc'
+	# dataset = 'ACSIncome_USA_2018_binned_imbalanced_1664500'
+	# dataset = 'ACSIncome_USA_2018_binned_imbalanced_16645'
+	dataset = 'ACSIncome_USA_2018_binned_imbalanced_1664'
+	# dataset = 'nursery'
+	# dataset = 'cmc'
 	base_dir = Path(f'../data/output2/{dataset}').resolve()
 	strats = ['BSAMPLE_V2', 'lDiv']
 	strat_names = ['bsample_s', 'l-diversity']
@@ -282,17 +288,22 @@ def figure_8():
 	kanon_dirs = []
 	report_paths = []
 	non_masked_report_paths = []
-
-	score_types = ['macro avg', '2']
-	names = ['macro avg', 'long-term']
+	
+	# score_types = ['macro avg', 'very_recom']
+	# score_types = ['macro avg', '2']
+	score_types = ['macro avg', '[100000-inf[']
+	# names = ['macro avg', 'long-term']
+	# names = ['macro avg', 'very_recom']
+	names = ['macro avg', 'rich']
 	k_list = [10, 20, 50, 100]
 	b_list = [0.5, 0.2, 0.01]
 	l_list = [2.0, 2.5, 3.0]
+	# l_list = [2.0, 3.0, 4.0]
 	data_frames = []
 	fraction_b_values = [Fraction(value).limit_denominator() for value in b_list]
 
 	for i, strat in enumerate(strats):
-		ml_dir = base_dir/f'{strat}/ml_experiments/experiment_1'
+		ml_dir = base_dir/f'{strat}/ml_experiments/experiment_3'
 		non_masked_report_path = base_dir/'inputdataset/folds/ml_experiments/experiment_1/classification_report.json'
 		ml_dirs.append(ml_dir)
 		non_masked_report_paths.append(non_masked_report_path)
@@ -348,8 +359,10 @@ def figure_8():
 
 def figure_6():
 	base_dir = Path('../data/output2').resolve()
-	# sizes = ['1664500', '16645', '1664']
-	sizes = ['16645',  '1664']
+	sizes = ['1664500', '16645', '1664']
+	sample_strat = 'BSAMPLE_V2'
+	experiment_num = 3
+	# sizes = ['16645',  '1664']
 	dataset_names = [f'ACSIncome {size}' for size in sizes ]
 	ml_dirs = []
 	kanon_dirs = []
@@ -357,18 +370,18 @@ def figure_6():
 	non_masked_report_paths = []
 
 	# Constants and settings
-	k_list = [5, 10, 20, 50, 100]
-	b_list = [0.5, 0.2, 0.1, 0.01]
+	k_list = [10, 20, 50, 100]
+	b_list = [0.5, 0.1, 0.01]
 	data_frames = []
 
 	# Generate paths for each size
 	for size in sizes:
 		size_dir = base_dir / f'ACSIncome_USA_2018_binned_imbalanced_{size}'
 		
-		ml_dir = size_dir / 'SSAMPLE_V2/ml_experiments/experiment_1'
-		kanon_dir = size_dir / 'kAnon/ml_experiments/experiment_1'
-		report_path = size_dir / 'inputDataset/folds/ml_experiments/experiment_1/classification_report.json'
-		non_masked_report_path = size_dir / 'inputdataset/folds/ml_experiments/experiment_1/classification_report.json'
+		ml_dir = size_dir / f'{sample_strat}/ml_experiments/experiment_{experiment_num}'
+		kanon_dir = size_dir / f'kAnon/ml_experiments/experiment_{experiment_num}'
+		report_path = size_dir / f'inputDataset/folds/ml_experiments/experiment_{experiment_num}/classification_report.json'
+		non_masked_report_path = size_dir / f'inputdataset/folds/ml_experiments/experiment_{experiment_num}/balanced/classification_report.json'
 		
 		ml_dirs.append(ml_dir)
 		kanon_dirs.append(kanon_dir)
@@ -395,7 +408,7 @@ def figure_6():
 
 	# Setup plot
 	score_types = ['macro avg', '[100000-inf[']
-	names = ['macro avg', 'rich']
+	names = ['macro avg f1-score', 'rich f1-score']
 	fig, axes = plt.subplots(len(sizes), len(score_types), figsize=(10, 5), sharey=True)
 	plt.subplots_adjust(hspace=0.5, wspace=0.1)
 
@@ -413,12 +426,12 @@ def figure_6():
 				x = np.arange(len(b_list))
 				width = 0.13
 				offset = width * k_list.index(k)
-				axes[j,i].bar(x + offset, values, width, yerr=error_bars, label=f'k={k}')
+				axes[j,i].bar(x + offset, values, width, yerr=error_bars, label=f'k={k}', capsize=4)
 
 			with open(non_masked_report_path, 'r') as f:
 				non_masked_report = json.load(f)
 				y_val = non_masked_report[score_type]['mean_f1-score']
-				axes[j,i].axhline(y=y_val, label='originele\n dataset', color='red', linestyle='--', zorder=0)
+				axes[j,i].axhline(y=y_val, label='Originele Dataset\n(Gebalanceerd)', color='red', linestyle='--', zorder=0)
 
 			axes[j,i].set_title(f'{dataset_names[j]} - {names[i]}')
 			axes[j,i].set_xlabel(BETA, loc='left', labelpad=-9)
@@ -828,7 +841,8 @@ if __name__ == '__main__':
 	# config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664.ini'
 	config_path = 'config/ACSIncome_USA_2018_binned_imbalanced_1664500.ini'
 	read_config(config_path)
-	# figure_8()
+	# compare_violin_plots(0, 5, 'journalistRisk', 'SSAMPLE_V2')
+	# figure_6()
 	# figure_6()
 	# privacy_plots_worker(['SSAMPLE_V2'], certainty=True, journalist_risk=False)
 	# ssample_rsample_certainty(1, 10, [0.25, 0.0625])
